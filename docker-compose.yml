@@ -40,7 +40,7 @@ services:
       - "8001:8000"
     volumes:
       - ./src:/app/src
-    command: uv run uvicorn src.agent_gourmet.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn src.agent_gourmet.main:app --host 0.0.0.0 --port 8000 --reload
 
   acadomie:
     build:
@@ -57,7 +57,7 @@ services:
       - "8002:8000"
     volumes:
       - ./src:/app/src
-    command: uv run uvicorn src.agent_acadomie.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn src.agent_acadomie.main:app --host 0.0.0.0 --port 8000 --reload
 
   explorer:
     build:
@@ -74,7 +74,7 @@ services:
       - "8003:8000"
     volumes:
       - ./src:/app/src
-    command: uv run uvicorn src.agent_explorer.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn src.agent_explorer.main:app --host 0.0.0.0 --port 8000 --reload
 
   maestro:
     build:
@@ -101,7 +101,7 @@ services:
       - "8000:8000"
     volumes:
       - ./src:/app/src
-    command: uv run uvicorn src.agent_maestro.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn src.agent_maestro.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   tegmen_postgres_data:
