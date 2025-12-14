@@ -1,0 +1,107 @@
+services:
+  # ===================
+  # SHARED INFRASTRUCTURE
+  # ===================
+
+  db:
+    image: postgres:18-alpine
+    container_name: tegmen-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_MULTIPLE_DATABASES: maestro,gourmet,acadomie,explorer
+    volumes:
+      - tegmen_postgres_data:/var/lib/postgresql/18/docker
+      - ./scripts/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  # ===================
+  # AGENTS
+  # ===================
+
+  gourmet:
+    build:
+      context: .
+      dockerfile: src/agent_gourmet/Dockerfile
+    container_name: tegmen-agent-gourmet
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DATABASE_URL=postgresql+asyncpg://gourmet:gourmet@db:5432/gourmet
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./src:/app/src
+    command: uv run uvicorn src.agent_gourmet.main:app --host 0.0.0.0 --port 8000 --reload
+
+  acadomie:
+    build:
+      context: .
+      dockerfile: src/agent_acadomie/Dockerfile
+    container_name: tegmen-agent-acadomie
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DATABASE_URL=postgresql+asyncpg://acadomie:acadomie@db:5432/acadomie
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./src:/app/src
+    command: uv run uvicorn src.agent_acadomie.main:app --host 0.0.0.0 --port 8000 --reload
+
+  explorer:
+    build:
+      context: .
+      dockerfile: src/agent_explorer/Dockerfile
+    container_name: tegmen-agent-explorer
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DATABASE_URL=postgresql+asyncpg://explorer:explorer@db:5432/explorer
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8003:8000"
+    volumes:
+      - ./src:/app/src
+    command: uv run uvicorn src.agent_explorer.main:app --host 0.0.0.0 --port 8000 --reload
+
+  maestro:
+    build:
+      context: .
+      dockerfile: src/agent_maestro/Dockerfile
+    container_name: tegmen-maestro
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DATABASE_URL=postgresql+asyncpg://maestro:maestro@db:5432/maestro
+      - MICROSERVICES_MODE=true
+      - GOURMET_URL=http://gourmet:8000
+      - ACADOMIE_URL=http://acadomie:8000
+      - EXPLORER_URL=http://explorer:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      gourmet:
+        condition: service_started
+      acadomie:
+        condition: service_started
+      explorer:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+    command: uv run uvicorn src.agent_maestro.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  tegmen_postgres_data:
