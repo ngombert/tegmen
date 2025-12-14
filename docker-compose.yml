@@ -103,5 +103,17 @@ services:
       - ./src:/app/src
     command: uvicorn src.agent_maestro.main:app --host 0.0.0.0 --port 8000 --reload
 
+  frontend:
+    build:
+      context: src/web-client
+      dockerfile: Dockerfile
+    container_name: tegmen-frontend
+    environment:
+      - MAESTRO_API_URL=${MAESTRO_API_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - maestro
+
 volumes:
   tegmen_postgres_data:

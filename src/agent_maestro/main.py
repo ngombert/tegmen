@@ -5,6 +5,7 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
@@ -46,6 +47,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
@@ -57,16 +66,16 @@ async def health_check():
 async def chat(request: ChatRequest):
     """
     Main chat endpoint.
-    
+
     1. Classify intent using SemanticRouter (local, fast)
     2. Route to appropriate agent (via A2A if microservices mode)
     3. Return agent response
     """
     session_id = request.session_id or str(uuid.uuid4())
-    
+
     # Step 1: Classify intent with semantic router
     route = classify_intent(request.message)
-    
+
     try:
         if MICROSERVICES_MODE and route != "unknown":
             # Step 2a: Call remote agent via A2A
@@ -79,11 +88,11 @@ async def chat(request: ChatRequest):
         else:
             # Step 2b: Use local fallback (Maestro or local agents)
             from src.agent_maestro.agents import get_agent
-            
+
             agent = get_agent(route)
             agent_name = agent.name
             user_id = request.user_id or "default_user"
-            
+
             session = await session_service.get_session(
                 app_name=config.APP_NAME,
                 user_id=user_id,
@@ -95,18 +104,17 @@ async def chat(request: ChatRequest):
                     user_id=user_id,
                     session_id=session_id,
                 )
-            
+
             runner = Runner(
                 agent=agent,
                 app_name=config.APP_NAME,
                 session_service=session_service,
             )
-            
+
             user_content = types.Content(
-                role="user",
-                parts=[types.Part(text=request.message)]
+                role="user", parts=[types.Part(text=request.message)]
             )
-            
+
             response_text = ""
             async for event in runner.run_async(
                 user_id=user_id,
@@ -115,17 +123,17 @@ async def chat(request: ChatRequest):
             ):
                 if event.is_final_response() and event.content and event.content.parts:
                     response_text = event.content.parts[0].text
-        
+
         if not response_text:
             response_text = "Je n'ai pas pu traiter votre demande. Veuillez réessayer."
-        
+
         return ChatResponse(
             message=response_text,
             agent=agent_name,
             session_id=session_id,
             route=route,
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
 
@@ -139,10 +147,10 @@ async def list_routes():
         {"name": "explorer", "description": "Voyages, sorties, activités"},
         {"name": "unknown", "description": "Questions générales (fallback)"},
     ]
-    
+
     if MICROSERVICES_MODE:
         for route in routes_info:
             if route["name"] in AGENT_URLS:
                 route["url"] = AGENT_URLS[route["name"]]
-    
+
     return {"routes": routes_info, "microservices_mode": MICROSERVICES_MODE}
