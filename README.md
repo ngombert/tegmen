@@ -62,6 +62,14 @@ Ce script exécute :
 2.  La vérification du routeur sémantique
 3.  Un test d'intégration A2A (Maestro -> Gourmet)
 
+### Exécuter les tests manuellement
+
+Pour lancer les tests avec le rapport de couverture :
+
+```bash
+PYTHONPATH=. uv run --with pytest-cov pytest --cov=src --cov-report=term-missing tests/
+```
+
 ## 📚 Documentation
 *   [Protocole A2A](docs/A2A.md) : Détails sur la communication entre agents.
 

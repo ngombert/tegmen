@@ -7,6 +7,7 @@ Runs unit tests, routing verification, and integration tests.
 import subprocess
 import sys
 import time
+import os
 from typing import List
 
 
@@ -19,11 +20,16 @@ def run_command(command: List[str], description: str) -> bool:
 
     start_time = time.time()
     try:
+        # Add current directory to PYTHONPATH
+        env = os.environ.copy()
+        env["PYTHONPATH"] = os.getcwd()
+
         # Use simple subprocess.run for now, streaming output would be better but this is simpler
         result = subprocess.run(
             command,
             check=False,
             capture_output=False,  # Let output flow to stdout
+            env=env,
         )
         duration = time.time() - start_time
 
