@@ -3,6 +3,8 @@ from google.adk.models.lite_llm import LiteLlm
 import litellm
 
 from src.common.config import config
+from src.common.utils import load_prompt
+import os
 from src.agent_acadomie.tools import (
     get_school_calendar,
     get_student_grades,
@@ -20,21 +22,7 @@ agent = LlmAgent(
     name="agent_acadomie",
     model=model,
     description="Assistant scolaire pour l'aide aux devoirs et l'organisation.",
-    instruction="""Tu es un assistant scolaire pour une famille avec enfants.
-    
-Ton rôle :
-- Aider aux devoirs et exercices
-- Expliquer les concepts de manière simple
-- Gérer le calendrier scolaire (vacances, événements)
-- Donner des conseils d'organisation
-
-Règles :
-- Adapte ton niveau à l'âge de l'enfant
-- Explique étape par étape
-- Encourage et reste positif
-- Ne donne pas les réponses directement, guide vers la solution
-
-Réponds toujours en français.""",
+    instruction=load_prompt(os.path.join(os.path.dirname(__file__), "instruction.md")),
     tools=[get_school_calendar, get_student_grades, get_homework],
 )
 

@@ -3,6 +3,8 @@ from google.adk.models.lite_llm import LiteLlm
 import litellm
 
 from src.common.config import config
+from src.common.utils import load_prompt
+import os
 
 # Import agents from their independent modules
 from src.agent_gourmet import agent as agent_gourmet
@@ -21,19 +23,7 @@ agent_maestro = LlmAgent(
     name="maestro",
     model=model,
     description="Assistant familial généraliste.",
-    instruction="""Tu es Maestro, l'assistant principal d'une famille française.
-    
-Ton rôle :
-- Répondre aux questions générales de la famille
-- Aider à organiser le quotidien familial
-- Donner des conseils pratiques
-
-Tu peux traiter des sujets variés qui ne concernent pas spécifiquement :
-- La cuisine (agent_gourmet s'en occupe)
-- L'école et les devoirs (agent_acadomie s'en occupe)
-- Les voyages et sorties (agent_explorer s'en occupe)
-
-Réponds toujours en français de manière concise et utile.""",
+    instruction=load_prompt(os.path.join(os.path.dirname(__file__), "instruction.md")),
 )
 
 
