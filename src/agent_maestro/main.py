@@ -14,6 +14,9 @@ from src.agent_maestro.router import classify_intent, warmup
 from src.agent_maestro.schemas import ChatRequest, ChatResponse, HealthResponse
 from src.common.config import config
 from src.common.a2a_client import call_remote_agent, AGENT_URLS
+from src.common.logger import setup_logger
+
+logger = setup_logger("maestro")
 
 
 # Session service for fallback Maestro agent
@@ -26,18 +29,18 @@ MICROSERVICES_MODE = os.getenv("MICROSERVICES_MODE", "false").lower() == "true"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events."""
-    print("🚀 Starting Tegmen Maestro...")
-    print(f"📦 Loading embedding model: {config.EMBEDDING_MODEL}")
+    logger.info("🚀 Starting Tegmen Maestro...")
+    logger.info(f"📦 Loading embedding model: {config.EMBEDDING_MODEL}")
     warmup()
-    print("✅ Semantic router ready!")
+    logger.info("✅ Semantic router ready!")
     if MICROSERVICES_MODE:
-        print("🔗 Microservices mode: Agents will be called via A2A")
+        logger.info("🔗 Microservices mode: Agents will be called via A2A")
         for name, url in AGENT_URLS.items():
-            print(f"   - {name}: {url}")
+            logger.info(f"   - {name}: {url}")
     else:
-        print("📦 Monolith mode: Agents loaded locally")
+        logger.info("📦 Monolith mode: Agents loaded locally")
     yield
-    print("👋 Shutting down Tegmen Maestro...")
+    logger.info("👋 Shutting down Tegmen Maestro...")
 
 
 app = FastAPI(
@@ -74,7 +77,9 @@ async def chat(request: ChatRequest):
     session_id = request.session_id or str(uuid.uuid4())
 
     # Step 1: Classify intent with semantic router
+    logger.info(f"Processing message: '{request.message}'")
     route = classify_intent(request.message)
+    logger.info(f"Routing decision: route='{route}' for message='{request.message}'")
 
     try:
         if MICROSERVICES_MODE and route != "unknown":
@@ -121,6 +126,7 @@ async def chat(request: ChatRequest):
                 session_id=session_id,
                 new_message=user_content,
             ):
+                logger.info(f"Local Agent Event: {event}")
                 if event.is_final_response() and event.content and event.content.parts:
                     response_text = event.content.parts[0].text
 

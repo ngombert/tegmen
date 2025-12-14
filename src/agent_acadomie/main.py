@@ -6,6 +6,18 @@ from fastapi import FastAPI
 from src.agent_acadomie.agent import agent
 from src.common.a2a_server import create_a2a_app
 from src.common.config import config
+from src.common.logger import setup_logger
+from contextlib import asynccontextmanager
+
+logger = setup_logger("agent_acadomie")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan - startup and shutdown events."""
+    logger.info("🚀 Starting Agent Acadomie...")
+    yield
+    logger.info("👋 Shutting down Agent Acadomie...")
 
 
 # Create A2A application
@@ -43,6 +55,7 @@ app = FastAPI(
     title="Agent Acadomie",
     description="Microservice A2A pour l'aide scolaire",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Mount A2A app at root

@@ -13,6 +13,10 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+from src.common.logger import setup_logger
+
+logger = setup_logger("a2a_server")
+
 
 class ADKAgentExecutor(AgentExecutor):
     """Execute ADK agents via A2A protocol."""
@@ -69,6 +73,7 @@ class ADKAgentExecutor(AgentExecutor):
             session_id=session_id,
             new_message=user_content,
         ):
+            logger.info(f"[{self.app_name}] Agent Event: {event}")
             if event.is_final_response() and event.content and event.content.parts:
                 final_response = event.content.parts[0].text
 
