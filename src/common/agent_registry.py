@@ -81,6 +81,10 @@ class AgentRegistry:
             for a in self._agents.values()
         ]
 
+    def get_agents(self) -> Dict[str, AgentConfig]:
+        """Return all agent configurations."""
+        return self._agents
+
     def get_all_utterances(self) -> Dict[str, List[str]]:
         """Return mapping of agent names to their utterances for semantic routing."""
         return {a.name: a.utterances for a in self._agents.values()}

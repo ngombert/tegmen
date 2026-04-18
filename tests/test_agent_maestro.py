@@ -22,9 +22,9 @@ from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
-def get_auth_headers():
+def get_auth_headers(user_id: str = "user-parent-1", family_id: str = "test-family"):
     token = jwt.encode(
-        {"family_id": "test-family", "user_id": "test-user"},
+        {"family_id": family_id, "user_id": user_id},
         config.JWT_SECRET,
         algorithm=config.JWT_ALGORITHM
     )
@@ -91,6 +91,21 @@ def test_chat_unauthorized():
     response = client.post("/chat", json={"message": "No token"})
     assert response.status_code == 401
     assert "Authentification requise" in response.json()["detail"]
+
+
+@patch("agent_maestro.main.classify_intent")
+def test_chat_rbac_child_blocked(mock_classify):
+    # Child user trying to access explorer (which is restricted in mock_profiles)
+    mock_classify.return_value = "explorer"
+    
+    response = client.post(
+        "/chat", 
+        json={"message": "Je veux voyager"},
+        headers=get_auth_headers(user_id="user-child-1")
+    )
+    
+    assert response.status_code == 403
+    assert "ne permet pas d'accéder à l'agent 'agent_explorer'" in response.json()["detail"]
 
 
 def test_routes_list():

@@ -6,7 +6,7 @@ from common.config import config
 
 def get_auth_headers():
     token = jwt.encode(
-        {"family_id": "test-family", "user_id": "test-user"},
+        {"family_id": "test-family", "user_id": "user-parent-1"},
         config.JWT_SECRET,
         algorithm=config.JWT_ALGORITHM
     )

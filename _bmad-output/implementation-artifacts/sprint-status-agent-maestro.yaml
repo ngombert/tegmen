@@ -52,16 +52,16 @@ development_status:
   epic-1-retrospective: optional
 
   # ── Epic 2: Bouclier de Contexte Actif et Confidentialité (Privacy) ─────────
-  epic-2: in-progress
+  epic-2: done
   2-1-authentification-stricte-et-validation-jwt: done
   2-2-filtre-pii-et-telemetrie-d-audit: done
-  2-3-hydratation-du-contexte-et-controle-parental-rbac: backlog
+  2-3-hydratation-du-contexte-et-controle-parental-rbac: done
   epic-2-retrospective: optional
 
   # ── Epic 3: Routage Sémantique Intelligent In-Memory ───────────────────────
   epic-3: in-progress
   3-0-registre-d-agents-config-driven-et-nettoyage: done
-  3-1-integration-modele-vectoriel-in-memory: backlog
+  3-1-integration-modele-vectoriel-in-memory: done
   3-2-reception-et-routage-de-l-intention-dispatch-a2a: backlog
   3-3-gestion-d-incompetence-et-fallback-local: backlog
   epic-3-retrospective: optional

@@ -22,6 +22,8 @@ class RequestContext(BaseModel):
 
     family_id: str
     user_id: str
+    user_name: str | None = None
+    role: str | None = None # e.g., 'parent', 'child'
     correlation_id: str
     language: str = "fr"
     preferences: dict | None = None
