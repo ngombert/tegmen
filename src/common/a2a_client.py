@@ -19,13 +19,16 @@ from a2a.types import (
 class RemoteAgentClient:
     """Client for communicating with remote A2A agents."""
 
-    def __init__(self, agent_url: str):
+    def __init__(self, agent_url: str, httpx_client: httpx.AsyncClient | None = None) -> None:
         """Initialize client with agent base URL."""
         self.agent_url = agent_url.rstrip("/")
-        # Configure httpx client with base_url
-        self.client = httpx.AsyncClient(base_url=self.agent_url, timeout=60.0)
+        # Configure httpx client with base_url and SLA timeout (Story 4.1)
+        self.client = httpx_client or httpx.AsyncClient(
+            base_url=self.agent_url, 
+            timeout=5.0
+        )
 
-    async def send_message(self, message: str, context_id: Optional[str] = None) -> str:
+    async def send_message(self, message: str, context_id: str | None = None) -> str:
         """Send a message to the remote agent and get response."""
 
         # Create A2A client
@@ -101,7 +104,7 @@ AGENT_URLS = {
 
 
 async def call_remote_agent(
-    route: str, message: str, context_id: Optional[str] = None
+    route: str, message: str, context_id: str | None = None
 ) -> str:
     """Call a remote agent by route name."""
     url = AGENT_URLS.get(route)

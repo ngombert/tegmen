@@ -59,7 +59,7 @@ app = FastAPI(
 )
 
 # Mount A2A app at root
-app.mount("/", a2a_app.build())
+app.mount("/", a2a_app)
 
 
 if __name__ == "__main__":

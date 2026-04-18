@@ -1,143 +1,89 @@
-"""A2A Server utilities for agent microservices."""
+"""A2A Server utilities for agent microservices (Lean version)."""
 
-from typing import Any
-import uuid
-
-from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
-from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import AgentCard, AgentCapabilities, AgentSkill
-from google.adk.agents import LlmAgent
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
+from typing import Any, Callable
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from src.common.logger import setup_logger
+from src.common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
+from src.common.exceptions import A2ARPCError
 
 logger = setup_logger("a2a_server")
 
+class A2AServer:
+    """Lean A2A Server implementation using FastAPI."""
 
-class ADKAgentExecutor(AgentExecutor):
-    """Execute ADK agents via A2A protocol."""
+    def __init__(self, agent_name: str) -> None:
+        self.agent_name = agent_name
+        self.methods: dict[str, Callable] = {}
 
-    def __init__(self, agent: LlmAgent, app_name: str):
-        self.agent = agent
-        self.app_name = app_name
-        self.session_service = InMemorySessionService()
+    def register_method(self, name: str, func: Callable) -> None:
+        """Register a handler for a JSON-RPC method."""
+        self.methods[name] = func
 
-    async def execute(
-        self,
-        context: RequestContext,
-        event_queue: Any,
-    ) -> None:
-        """Execute the agent with the given context."""
-        # Get or create session
-        session_id = context.context_id or str(uuid.uuid4())
-        user_id = "a2a_user"
-
-        session = await self.session_service.get_session(
-            app_name=self.app_name,
-            user_id=user_id,
-            session_id=session_id,
-        )
-        if session is None:
-            session = await self.session_service.create_session(
-                app_name=self.app_name,
-                user_id=user_id,
-                session_id=session_id,
+    async def handle_request(self, request: JsonRpcRequest) -> JsonRpcResponse:
+        """Handle a JSON-RPC request."""
+        if request.method not in self.methods:
+            return JsonRpcResponse(
+                id=request.id,
+                error=JsonRpcError(
+                    code=A2ARPCError.METHOD_NOT_FOUND,
+                    message=f"Method '{request.method}' not found"
+                )
             )
 
-        # Create runner
-        runner = Runner(
-            agent=self.agent,
-            app_name=self.app_name,
-            session_service=self.session_service,
-        )
-
-        # Get user message from context
-        user_message = ""
-        if context.message and context.message.parts:
-            for part in context.message.parts:
-                if part.root and hasattr(part.root, "text") and part.root.text:
-                    user_message = part.root.text
-                    break
-
-        # Create user content
-        user_content = types.Content(role="user", parts=[types.Part(text=user_message)])
-
-        # Run agent
-        final_response = ""
-        async for event in runner.run_async(
-            user_id=user_id,
-            session_id=session_id,
-            new_message=user_content,
-        ):
-            logger.info(f"[{self.app_name}] Agent Event: {event}")
-            if event.is_final_response() and event.content and event.content.parts:
-                final_response = event.content.parts[0].text
-
-        # Send response via event queue
-        from a2a.types import TextPart, Message, Role
-
-        response_part = TextPart(
-            text=final_response or "Je n'ai pas pu traiter votre demande."
-        )
-        response_message = Message(
-            role=Role.agent,
-            parts=[response_part],
-            messageId=str(uuid.uuid4()),
-        )
-        await event_queue.enqueue_event(response_message)
-
-    async def cancel(self, context: RequestContext, event_queue: Any) -> None:
-        """Cancel execution (not implemented)."""
-        pass
+        handler = self.methods[request.method]
+        try:
+            result = await handler(request.params)
+            return JsonRpcResponse(id=request.id, result=result)
+        except Exception as e:
+            logger.error(f"Error executing method {request.method}: {e}")
+            return JsonRpcResponse(
+                id=request.id,
+                error=JsonRpcError(
+                    code=A2ARPCError.INTERNAL_ERROR,
+                    message=str(e)
+                )
+            )
 
 
 def create_a2a_app(
-    agent: LlmAgent,
+    agent: Any,  # Kept for compatibility, but ADK dependencies removed
     agent_name: str,
     agent_description: str,
     skills: list[dict],
     public_url: str,
     version: str = "0.1.0",
-) -> A2AStarletteApplication:
-    """Create an A2A Starlette application for an agent."""
-
-    # Create agent card
-    agent_card = AgentCard(
-        name=agent_name,
+) -> FastAPI:
+    """
+    Create a Lean A2A FastAPI application for an agent.
+    
+    NOTE: This replaces the legacy ADK-based version. 
+    ADKAgentExecutor is removed as part of the transition to a pure FastAPI/Pydantic stack.
+    """
+    app = FastAPI(
+        title=agent_name,
         description=agent_description,
-        url=public_url,
-        version=version,
-        capabilities=AgentCapabilities(streaming=False),
-        defaultInputModes=["text"],
-        defaultOutputModes=["text"],
-        skills=[
-            AgentSkill(
-                id=skill["id"],
-                name=skill["name"],
-                description=skill["description"],
-                tags=[],
-            )
-            for skill in skills
-        ],
+        version=version
     )
 
-    # Create executor
-    executor = ADKAgentExecutor(agent=agent, app_name=agent_name)
+    server = A2AServer(agent_name)
 
-    # Create request handler
-    handler = DefaultRequestHandler(
-        agent_executor=executor,
-        task_store=InMemoryTaskStore(),
-    )
+    @app.post("/a2a/SendMessage")
+    async def send_message(rpc_request: JsonRpcRequest) -> JsonRpcResponse:
+        """Endpoint for A2A communication."""
+        return await server.handle_request(rpc_request)
 
-    # Create A2A app
-    app = A2AStarletteApplication(
-        agent_card=agent_card,
-        http_handler=handler,
-    )
+    @app.get("/a2a/AgentCard")
+    async def get_agent_card() -> dict[str, Any]:
+        """Return agent metadata."""
+        return {
+            "name": agent_name,
+            "description": agent_description,
+            "url": public_url,
+            "version": version,
+            "skills": skills
+        }
 
+    # Helper to return the app (compatible with mount points)
     return app

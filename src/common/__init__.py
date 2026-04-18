@@ -1,5 +1,17 @@
-"""Common module - shared utilities and base classes."""
+"""Common utilities for Tegmen Agents."""
 
-from src.common.config import config
+from src.common.exceptions import A2ARPCError
+from src.common.schemas import (
+    JsonRpcRequest,
+    JsonRpcResponse,
+    JsonRpcError,
+    RequestContext
+)
 
-__all__ = ["config"]
+__all__ = [
+    "A2ARPCError",
+    "JsonRpcRequest",
+    "JsonRpcResponse",
+    "JsonRpcError",
+    "RequestContext",
+]
