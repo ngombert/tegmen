@@ -56,19 +56,27 @@ app.add_middleware(
 )
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse, tags=["System"], summary="État de santé")
 async def health_check():
-    """Health check endpoint."""
+    """Vérifie que l'agent Maestro est en ligne et prêt à router."""
     return HealthResponse()
 
 
-@app.post("/api/v1/routing", response_model=JsonRpcResponse)
+@app.post(
+    "/api/v1/routing", 
+    response_model=JsonRpcResponse, 
+    tags=["Gateway"],
+    summary="Point d'entrée principal du routage A2A",
+    responses={
+        422: {"description": "Erreur de validation structurelle de la requête JSON-RPC"}
+    }
+)
 async def route_request(request: JsonRpcRequest):
     """
-    Main Gateway Routing Endpoint.
+    Endpoint principal du Gateway Maestro.
     
-    Receives a standard JSON-RPC 2.0 request and routes it to the 
-    appropriate specialized agent based on semantic classification.
+    Reçoit une requête standard JSON-RPC 2.0 et la dirige vers l'agent spécialisé 
+    compétent après une classification sémantique de l'intention utilisateur.
     """
     logger.info(f"📥 Received A2A routing request: method='{request.method}', id='{request.id}'")
     
@@ -84,14 +92,12 @@ async def route_request(request: JsonRpcRequest):
     )
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat", response_model=ChatResponse, tags=["Legacy"], summary="Vieux point d'entrée REST Chat")
 async def chat(request: ChatRequest):
     """
-    Main chat endpoint.
-
-    1. Classify intent using SemanticRouter (local, fast)
-    2. Route to appropriate agent (via A2A if microservices mode)
-    3. Return agent response
+    Ancien endpoint de chat (Style REST).
+    
+    *Bientôt déprécié au profit de /api/v1/routing.*
     """
     session_id = request.session_id or str(uuid.uuid4())
 
@@ -112,16 +118,7 @@ async def chat(request: ChatRequest):
                 context_id=session_id,
             )
             agent_name = f"agent_{route}"
-        if not response_text:
-            response_text = "Je n'ai pas pu traiter votre demande. Veuillez réessayer."
-
-        return ChatResponse(
-            message=response_text,
-            agent=agent_name,
-            session_id=session_id,
-            route=route,
-        )
-
+            
         if not response_text:
             response_text = "Je n'ai pas pu traiter votre demande. Veuillez réessayer."
 
@@ -136,9 +133,9 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
 
 
-@app.get("/routes")
+@app.get("/routes", tags=["System"], summary="Liste des agents et URLS")
 async def list_routes():
-    """List available routes and their descriptions."""
+    """Liste les agents spécialisés disponibles et leurs descriptions."""
     routes_info = [
         {"name": "gourmet", "description": "Cuisine, recettes, menus"},
         {"name": "acadomie", "description": "École, devoirs, calendrier scolaire"},

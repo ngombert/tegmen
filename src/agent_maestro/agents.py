@@ -7,9 +7,9 @@ from common.utils import load_prompt
 import os
 
 # Import agents from their independent modules
-from agent_gourmet import agent as agent_gourmet
-from agent_acadomie import agent as agent_acadomie
-from agent_explorer import agent as agent_explorer
+from agent_gourmet.agent import agent as agent_gourmet
+from agent_acadomie.agent import agent as agent_acadomie
+from agent_explorer.agent import agent as agent_explorer
 
 # Suppress LiteLLM debug info if not in debug mode
 litellm.suppress_debug_info = not config.DEBUG
