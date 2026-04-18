@@ -60,7 +60,11 @@ def get_router() -> SemanticRouter:
         logger.info(f"Semantic router initialized with {len(_router.routes)} routes.")
     return _router
 
-def classify_intent(message: str) -> str:
+# Confidence Thresholds
+THRESHOLD_ROUTING = 0.30      # Full confidence
+THRESHOLD_CLARIFICATION = 0.15 # Ambiguous - ask for clarification
+
+def classify_intent(message: str) -> tuple[str, float]:
     """
     Classify user intent using semantic similarity.
 
@@ -68,17 +72,20 @@ def classify_intent(message: str) -> str:
         message: User message to classify
 
     Returns:
-        Route name or 'unknown'
+        (Route name, similarity_score)
     """
     if not message:
-        return "unknown"
+        return ("unknown", 0.0)
         
     router_inst = get_router()
     result = router_inst(message)
     
-    if result.name is None:
-        return "unknown"
-    return result.name
+    route_name = result.name if result.name else "unknown"
+    score = getattr(result, "similarity_score", 0.0)
+    if score is None:
+        score = 0.0
+    
+    return (route_name, float(score))
 
 def warmup() -> None:
     """Pre-load the embedding model and verify all routes are ready."""

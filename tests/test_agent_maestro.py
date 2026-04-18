@@ -39,7 +39,7 @@ def test_health_check():
 @patch("agent_maestro.main.classify_intent")
 @patch("agent_maestro.main.call_remote_agent")
 def test_chat_routing_gourmet(mock_call_remote, mock_classify):
-    mock_classify.return_value = "gourmet"
+    mock_classify.return_value = ("gourmet", 0.9)
     mock_call_remote.return_value = "Mocked gourmet response"
 
     response = client.post(
@@ -58,7 +58,7 @@ def test_chat_routing_gourmet(mock_call_remote, mock_classify):
 @patch("agent_maestro.main.classify_intent")
 @patch("agent_maestro.main.call_remote_agent")
 def test_chat_remote_error(mock_call_remote, mock_classify):
-    mock_classify.return_value = "gourmet"
+    mock_classify.return_value = ("gourmet", 0.9)
     mock_call_remote.side_effect = Exception("Remote failure")
 
     response = client.post(
@@ -73,7 +73,7 @@ def test_chat_remote_error(mock_call_remote, mock_classify):
 
 @patch("agent_maestro.main.classify_intent")
 def test_chat_unknown_intent(mock_classify):
-    mock_classify.return_value = "unknown"
+    mock_classify.return_value = ("unknown", 0.05)
 
     response = client.post(
         "/chat", 
@@ -88,6 +88,25 @@ def test_chat_unknown_intent(mock_classify):
     assert "agent Gourmet" in data["message"]  # From UNKNOWN_RESPONSE constant
 
 
+@patch("agent_maestro.main.classify_intent")
+def test_chat_clarification(mock_classify):
+    # Medium confidence score (between 0.15 and 0.3)
+    mock_classify.return_value = ("gourmet", 0.2)
+
+    response = client.post(
+        "/chat", 
+        json={"message": "Pâtes ?"},
+        headers=get_auth_headers()
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["route"] == "gourmet"
+    assert data["agent"] == "maestro"
+    assert "pas s\xfbr de bien comprendre" in data["message"].lower()
+    assert "agent **Gourmet**" in data["message"]
+
+
 def test_chat_unauthorized():
     response = client.post("/chat", json={"message": "No token"})
     assert response.status_code == 401
@@ -97,7 +116,7 @@ def test_chat_unauthorized():
 @patch("agent_maestro.main.classify_intent")
 def test_chat_rbac_child_blocked(mock_classify):
     # Child user trying to access explorer (which is restricted in mock_profiles)
-    mock_classify.return_value = "explorer"
+    mock_classify.return_value = ("explorer", 0.9)
     
     response = client.post(
         "/chat", 

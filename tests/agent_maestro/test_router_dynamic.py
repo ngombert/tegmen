@@ -14,10 +14,14 @@ def reset_router():
 
 def test_classify_chitchat():
     # Even with 0 dynamic agents, chitchat should work
-    assert classify_intent("Salut") == "chitchat"
+    route, score = classify_intent("Salut")
+    assert route == "chitchat"
+    assert score > 0.5
 
 def test_classify_unknown():
-    assert classify_intent("XJKYZZZ random text") == "unknown"
+    route, score = classify_intent("XJKYZZZ random text")
+    assert route == "unknown"
+    assert score < 0.2
 
 @patch("agent_maestro.router.agent_registry")
 def test_dynamic_reloal_and_routing(mock_registry):
@@ -34,12 +38,21 @@ def test_dynamic_reloal_and_routing(mock_registry):
     reload_router()
     
     # Test routing to the new agent
-    # Using an exact utterance to ensure 1.0 score
-    assert classify_intent("Vends-moi un tapis") == "carpet_dealer"
+    # Using an exact utterance to ensure high enough score
+    route, score = classify_intent("Vends-moi un tapis")
+    assert route == "carpet_dealer"
+    assert score > 0.5
     
     # Verify chitchat still works
-    assert classify_intent("Salut") == "chitchat"
+    route, score = classify_intent("Salut")
+    assert route == "chitchat"
+    assert score > 0.5
 
 def test_empty_message():
-    assert classify_intent("") == "unknown"
-    assert classify_intent(None) == "unknown"
+    route, score = classify_intent("")
+    assert route == "unknown"
+    assert score == 0.0
+    
+    route, score = classify_intent(None)
+    assert route == "unknown"
+    assert score == 0.0

@@ -63,7 +63,7 @@ development_status:
   3-0-registre-d-agents-config-driven-et-nettoyage: done
   3-1-integration-modele-vectoriel-in-memory: done
   3-2-reception-et-routage-de-l-intention-dispatch-a2a: done
-  3-3-gestion-d-incompetence-et-fallback-local: backlog
+  3-3-gestion-d-incompetence-et-fallback-local: done
   epic-3-retrospective: optional
 
   # ── Epic 4: Résilience Absolue et Dégradation Gracieuse ────────────────────

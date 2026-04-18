@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
-from agent_maestro.router import classify_intent, warmup
+from agent_maestro.router import classify_intent, warmup, THRESHOLD_ROUTING, THRESHOLD_CLARIFICATION
 from agent_maestro.schemas import ChatRequest, ChatResponse, HealthResponse
 from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
 from common.config import config
@@ -115,6 +115,13 @@ UNKNOWN_RESPONSE = (
     "🌍 les voyages (agent Explorer)."
 )
 
+# Template for ambiguous intents
+CLARIFICATION_TEMPLATE = (
+    "Je ne suis pas sûr de bien comprendre... 🧐\n"
+    "Voulez-vous parler à l'agent **{agent_display}** ?\n\n"
+    "(Si oui, soyez un peu plus précis dans votre demande !)"
+)
+
 
 @app.get("/health", response_model=HealthResponse, tags=["System"], summary="État de santé")
 async def health_check():
@@ -158,27 +165,35 @@ async def route_request(
     )
 
     # Classify intent
-    route = classify_intent(message) if message else "unknown"
-    logger.info(f"🎯 Intent classified: route='{route}'")
+    route, score = classify_intent(message) if message else ("unknown", 0.0)
+    logger.info(f"🎯 Intent classified: route='{route}', score={score:.4f}")
 
     # RBAC Check
     check_agent_access(f"agent_{route}", context)
 
-    # Dispatch
+    # Dispatch logic based on confidence thresholds
     try:
-        if route == "chitchat":
+        if route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
-        elif route == "unknown" or not message:
-            response_text = UNKNOWN_RESPONSE
-            agent_name = "maestro"
-        else:
+        elif score >= THRESHOLD_ROUTING:
+            # High confidence -> Direct dispatch
             response_text = await call_remote_agent(
                 route=route,
                 message=message,
                 context_id=str(request.id),
             )
             agent_name = f"agent_{route}"
+        elif score >= THRESHOLD_CLARIFICATION:
+            # Medium confidence -> Clarification
+            agent_display = route.capitalize()
+            response_text = CLARIFICATION_TEMPLATE.format(agent_display=agent_display)
+            agent_name = "maestro"
+        else:
+            # Low confidence or unknown -> Unknown fallback
+            response_text = UNKNOWN_RESPONSE
+            agent_name = "maestro"
+            route = "unknown" # Normalize for response
 
         return JsonRpcResponse(
             jsonrpc="2.0",
@@ -223,23 +238,17 @@ async def chat(
 
     # Step 1: Classify intent with semantic router
     logger.info(f"Processing message for {context.user_name}: '{sanitized_message}'")
-    route = classify_intent(sanitized_message)
-    logger.info(f"Routing decision: route='{route}' for message='{sanitized_message}'")
+    route, score = classify_intent(sanitized_message)
+    logger.info(f"Routing decision: route='{route}', score={score:.4f}")
     
     # Step 1.5: RBAC Check
     check_agent_access(f"agent_{route}", context)
 
-    response_text = ""
-    agent_name = f"agent_{route}"
-
     try:
-        if route == "chitchat":
+        if route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
-        elif route == "unknown":
-            response_text = UNKNOWN_RESPONSE
-            agent_name = "maestro"
-        else:
+        elif score >= THRESHOLD_ROUTING:
             # Step 2: Call remote specialized agent via A2A
             response_text = await call_remote_agent(
                 route=route,
@@ -247,6 +256,16 @@ async def chat(
                 context_id=session_id,
             )
             agent_name = f"agent_{route}"
+        elif score >= THRESHOLD_CLARIFICATION:
+            # Clarification
+            agent_display = route.capitalize()
+            response_text = CLARIFICATION_TEMPLATE.format(agent_display=agent_display)
+            agent_name = "maestro"
+        else:
+            # Unknown
+            response_text = UNKNOWN_RESPONSE
+            agent_name = "maestro"
+            route = "unknown"
 
         return ChatResponse(
             message=response_text,
