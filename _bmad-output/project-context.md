@@ -54,6 +54,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Conventions de Nommage :** Format `snake_case` classique pour les variables locales et méthodes. Format `PascalCase` obligatoire pour les classes et particulièrement les Modèles Pydantic. Format `UPPER_SNAKE_CASE` pour les constantes globales.
 - **Documentation Automatique (FastAPI) :** Toute route d'API doit systématiquement intégrer son docstring et préciser les champs `summary` et `description` afin d'alimenter correctement Swagger / OpenAPI. Ceci est crucial pour interagir facilement en A2A.
 - **Documentation des Compétences (Google ADK) :** Les "Skills" exposées au LLM via l'ADK doivent impérativement avoir des docstrings exhaustives (description précise des arguments et de l'objectif), car elles servent de prompt de décision pour le module de tri.
+- **Documentation Microservice Obligatoire :** Chaque agent (`src/agent_*/`) et le module `common/` doivent contenir un `README.md` dédié suivant le template standardisé du projet (cf. `docs/templates/README-gateway.template.md` pour le gateway, `docs/templates/README-agent.template.md` pour les agents domaine). Ce README doit être créé lors de l'epic fondateur de l'agent et mis à jour à chaque story modifiant l'API, la configuration ou les skills A2A. Le README ne duplique pas le Swagger (un lien suffit) mais documente le périmètre métier, le lancement standalone, les tests et le contrat A2A. L'absence de README est un critère bloquant pour la validation d'un epic.
 
 ### Development Workflow Rules
 
