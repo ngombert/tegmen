@@ -1,7 +1,7 @@
 """Verification script for Agent Gourmet tools."""
 
-from src.agent_gourmet.tools import search_recipes, get_recipe_details
-from src.agent_gourmet.agent import agent
+from agent_gourmet.tools import search_recipes, get_recipe_details
+from agent_gourmet.agent import agent
 
 def verify_tools():
     print("🍳 Testing search_recipes tool...")

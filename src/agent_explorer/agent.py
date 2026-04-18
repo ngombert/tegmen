@@ -2,10 +2,10 @@ from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
 import litellm
 
-from src.common.config import config
-from src.common.utils import load_prompt
+from common.config import config
+from common.utils import load_prompt
 import os
-from src.agent_explorer.tools import (
+from agent_explorer.tools import (
     search_destinations,
     get_activities,
     get_weather_forecast,

@@ -4,7 +4,7 @@ from semantic_router import Route
 from semantic_router.routers import SemanticRouter
 from semantic_router.encoders import HuggingFaceEncoder
 
-from src.common.config import config
+from common.config import config
 
 # Initialize encoder with local model
 encoder = HuggingFaceEncoder(name=config.EMBEDDING_MODEL)

@@ -2,10 +2,10 @@ from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
 import litellm
 
-from src.common.config import config
-from src.common.utils import load_prompt
+from common.config import config
+from common.utils import load_prompt
 import os
-from src.agent_gourmet.tools import search_recipes, get_recipe_details
+from agent_gourmet.tools import search_recipes, get_recipe_details
 
 # Suppress LiteLLM debug info if not in debug mode
 litellm.suppress_debug_info = not config.DEBUG

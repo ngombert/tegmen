@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("verification")
 
 try:
-    from src.agent_maestro.router import classify_intent, warmup
+    from agent_maestro.router import classify_intent, warmup
 except ImportError:
     print("❌ Error: Could not import router. Make sure you are running from project root.")
     exit(1)

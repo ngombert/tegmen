@@ -1,6 +1,6 @@
 import pytest
 import httpx
-from src.common.a2a_client import RemoteAgentClient
+from common.a2a_client import RemoteAgentClient
 
 @pytest.mark.asyncio
 async def test_remote_agent_client_timeout(httpx_mock):

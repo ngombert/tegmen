@@ -7,12 +7,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.agent_maestro.router import classify_intent, warmup
-from src.agent_maestro.schemas import ChatRequest, ChatResponse, HealthResponse
-from src.common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
-from src.common.config import config
-from src.common.a2a_client import call_remote_agent, AGENT_URLS
-from src.common.logger import setup_logger
+from agent_maestro.router import classify_intent, warmup
+from agent_maestro.schemas import ChatRequest, ChatResponse, HealthResponse
+from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
+from common.config import config
+from common.a2a_client import call_remote_agent, AGENT_URLS
+from common.logger import setup_logger
 
 logger = setup_logger("maestro")
 

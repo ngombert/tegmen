@@ -4,7 +4,7 @@ import httpx
 from typing import Optional
 import uuid
 
-from src.common.config import config
+from common.config import config
 
 from a2a.client.transports.jsonrpc import JsonRpcTransport
 from a2a.types import (

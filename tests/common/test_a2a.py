@@ -1,13 +1,13 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from src.common.a2a_client import call_remote_agent
-from src.common.a2a_server import create_a2a_app
-from src.common.schemas import JsonRpcRequest, JsonRpcResponse
+from common.a2a_client import call_remote_agent
+from common.a2a_server import create_a2a_app
+from common.schemas import JsonRpcRequest, JsonRpcResponse
 
 
 # A2A Client Tests
 @pytest.mark.asyncio
-@patch("src.common.a2a_client.httpx.AsyncClient")
+@patch("common.a2a_client.httpx.AsyncClient")
 async def test_call_remote_agent_success(mock_client_cls):
     # Setup mock parsed response
     mock_response_obj = MagicMock()
@@ -23,7 +23,7 @@ async def test_call_remote_agent_success(mock_client_cls):
     mock_client_instance.aclose = AsyncMock()
 
     # Setup JsonRpcTransport mock inside RemoteAgentClient
-    with patch("src.common.a2a_client.JsonRpcTransport") as MockTransport:
+    with patch("common.a2a_client.JsonRpcTransport") as MockTransport:
         mock_transport_instance = MockTransport.return_value
         mock_transport_instance.send_message = AsyncMock(return_value=mock_response_obj.root.result)
 

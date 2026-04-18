@@ -3,10 +3,10 @@
 import uvicorn
 from fastapi import FastAPI
 
-from src.agent_gourmet.agent import agent
-from src.common.a2a_server import create_a2a_app
-from src.common.config import config
-from src.common.logger import setup_logger
+from agent_gourmet.agent import agent
+from common.a2a_server import create_a2a_app
+from common.config import config
+from common.logger import setup_logger
 from contextlib import asynccontextmanager
 
 logger = setup_logger("agent_gourmet")

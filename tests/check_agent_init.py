@@ -4,10 +4,10 @@ import os
 # Add project root to python path
 sys.path.append(os.getcwd())
 
-from src.agent_gourmet.main import a2a_app as gourmet_app
-from src.agent_acadomie.main import a2a_app as acadomie_app
-from src.agent_explorer.main import a2a_app as explorer_app
-from src.common.config import config
+from agent_gourmet.main import a2a_app as gourmet_app
+from agent_acadomie.main import a2a_app as acadomie_app
+from agent_explorer.main import a2a_app as explorer_app
+from common.config import config
 
 
 def verify_agent_config():

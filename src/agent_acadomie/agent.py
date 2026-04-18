@@ -2,10 +2,10 @@ from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
 import litellm
 
-from src.common.config import config
-from src.common.utils import load_prompt
+from common.config import config
+from common.utils import load_prompt
 import os
-from src.agent_acadomie.tools import (
+from agent_acadomie.tools import (
     get_school_calendar,
     get_student_grades,
     get_homework,

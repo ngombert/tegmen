@@ -1,7 +1,7 @@
 """Common utilities for Tegmen Agents."""
 
-from src.common.exceptions import A2ARPCError
-from src.common.schemas import (
+from common.exceptions import A2ARPCError
+from common.schemas import (
     JsonRpcRequest,
     JsonRpcResponse,
     JsonRpcError,

@@ -4,8 +4,8 @@ from unittest.mock import patch
 import pytest
 
 
-from src.common.logger import setup_logger
-from src.common.utils import load_prompt
+from common.logger import setup_logger
+from common.utils import load_prompt
 
 
 import sys
@@ -16,10 +16,10 @@ from importlib import reload
 def test_settings_defaults():
     # Force reload of settings to avoid cached values
     with patch.dict(os.environ, {}, clear=True):
-        if "src.common.config" in sys.modules:
-            reload(sys.modules["src.common.config"])
+        if "common.config" in sys.modules:
+            reload(sys.modules["common.config"])
 
-        from src.common.config import get_settings
+        from common.config import get_settings
 
         get_settings.cache_clear()
 
@@ -31,10 +31,10 @@ def test_settings_defaults():
 
 def test_settings_override():
     with patch.dict(os.environ, {"DEBUG": "true", "APP_NAME": "test_app"}):
-        if "src.common.config" in sys.modules:
-            reload(sys.modules["src.common.config"])
+        if "common.config" in sys.modules:
+            reload(sys.modules["common.config"])
 
-        from src.common.config import get_settings
+        from common.config import get_settings
 
         get_settings.cache_clear()
 
@@ -84,7 +84,7 @@ def test_load_prompt_success(tmp_path):
     # For success, we can try to load a known file, e.g., README.md if it was a prompt?
     # Or mock Environment.get_template
 
-    with patch("src.common.utils.Environment") as MockEnv:
+    with patch("common.utils.Environment") as MockEnv:
         mock_env_instance = MockEnv.return_value
         mock_template = mock_env_instance.get_template.return_value
         mock_template.render.return_value = "Rendered Prompt"

@@ -1,12 +1,12 @@
 """Unit tests for Agent Acadomie."""
 
 import pytest
-from src.agent_acadomie.tools import (
+from agent_acadomie.tools import (
     get_school_calendar,
     get_student_grades,
     get_homework,
 )
-from src.agent_acadomie.agent import agent
+from agent_acadomie.agent import agent
 import json
 
 

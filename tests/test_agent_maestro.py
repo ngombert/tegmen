@@ -3,8 +3,8 @@ from unittest.mock import patch, AsyncMock, MagicMock
 # Mock semantic_router components to avoid loading heavy models during unit tests
 # We must do this before importing the app
 with (
-    patch("src.agent_maestro.router.HuggingFaceEncoder"),
-    patch("src.agent_maestro.router.SemanticRouter") as MockRouter,
+    patch("agent_maestro.router.HuggingFaceEncoder"),
+    patch("agent_maestro.router.SemanticRouter") as MockRouter,
 ):
     # Setup mock router to be callable
     mock_router_instance = MagicMock()
@@ -14,7 +14,7 @@ with (
     mock_route_result.name = "gourmet"
     mock_router_instance.return_value = mock_route_result
 
-    from src.agent_maestro.main import app
+    from agent_maestro.main import app
 
 from fastapi.testclient import TestClient
 
@@ -26,7 +26,7 @@ def test_health_check():
     assert response.status_code == 200
 
 
-@patch("src.agent_maestro.main.classify_intent")
+@patch("agent_maestro.main.classify_intent")
 def test_chat_routing_gourmet(mock_classify):
     mock_classify.return_value = "gourmet"
 
@@ -34,8 +34,8 @@ def test_chat_routing_gourmet(mock_classify):
     # Test Monolith mode (default) logic
     # We mock get_agent and Runner/session_service to avoid complex local agent setup
     with (
-        patch("src.agent_maestro.main.MICROSERVICES_MODE", False),
-        patch("src.agent_maestro.agents.get_agent") as mock_get_agent,
+        patch("agent_maestro.main.MICROSERVICES_MODE", False),
+        patch("agent_maestro.agents.get_agent") as mock_get_agent,
     ):
         mock_agent = MagicMock()
         mock_agent.name = "agent_gourmet"
@@ -50,14 +50,14 @@ def test_chat_routing_gourmet(mock_classify):
         assert "réessayer" in data["message"]
 
 
-@patch("src.agent_maestro.main.classify_intent")
-@patch("src.agent_maestro.main.call_remote_agent")
+@patch("agent_maestro.main.classify_intent")
+@patch("agent_maestro.main.call_remote_agent")
 def test_chat_microservices_gourmet(mock_call_remote, mock_classify):
     mock_classify.return_value = "gourmet"
     mock_call_remote.return_value = "Remote pasta recipe"
 
     # Set MICROSERVICES_MODE to True
-    with patch("src.agent_maestro.main.MICROSERVICES_MODE", True):
+    with patch("agent_maestro.main.MICROSERVICES_MODE", True):
         response = client.post("/chat", json={"message": "Je veux des pâtes"})
 
         assert response.status_code == 200
@@ -68,13 +68,13 @@ def test_chat_microservices_gourmet(mock_call_remote, mock_classify):
         mock_call_remote.assert_called_once()
 
 
-@patch("src.agent_maestro.main.classify_intent")
+@patch("agent_maestro.main.classify_intent")
 def test_chat_unknown_intent(mock_classify):
     mock_classify.return_value = "unknown"
 
     with (
-        patch("src.agent_maestro.main.MICROSERVICES_MODE", False),
-        patch("src.agent_maestro.agents.get_agent") as mock_get_agent,
+        patch("agent_maestro.main.MICROSERVICES_MODE", False),
+        patch("agent_maestro.agents.get_agent") as mock_get_agent,
     ):
         mock_agent = MagicMock()
         mock_agent.name = "agent_unknown"

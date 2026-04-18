@@ -1,4 +1,4 @@
-from src.agent_gourmet.tools import search_recipes, get_recipe_details
+from agent_gourmet.tools import search_recipes, get_recipe_details
 
 
 def test_search_recipes_all():

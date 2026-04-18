@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from src.common.models import FamilyMember, Preference, ConversationLog
-from src.common.database import get_db
+from common.models import FamilyMember, Preference, ConversationLog
+from common.database import get_db
 
 
 def test_family_member_model_repr():
@@ -35,7 +35,7 @@ async def test_get_db_yields_session():
     mock_context_manager.__aexit__ = AsyncMock(return_value=None)
     mock_factory.return_value = mock_context_manager
 
-    with patch("src.common.database.async_session_factory", mock_factory):
+    with patch("common.database.async_session_factory", mock_factory):
         async for session in get_db():
             assert session == mock_session
 
@@ -59,7 +59,7 @@ async def test_get_db_rollback_on_error():
     mock_context_manager.__aexit__ = AsyncMock(return_value=None)
     mock_factory.return_value = mock_context_manager
 
-    with patch("src.common.database.async_session_factory", mock_factory):
+    with patch("common.database.async_session_factory", mock_factory):
         with pytest.raises(ValueError):
             async for session in get_db():
                 raise ValueError("Test error")

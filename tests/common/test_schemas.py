@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from src.common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError, RequestContext
+from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError, RequestContext
 
 def test_json_rpc_request_valid():
     """Test valid JsonRpcRequest."""

@@ -1,6 +1,6 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
-from src.agent_maestro.main import app
+from agent_maestro.main import app
 
 @pytest.mark.asyncio
 async def test_gateway_routing_success():

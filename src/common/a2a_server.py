@@ -4,9 +4,9 @@ from typing import Any, Callable
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from src.common.logger import setup_logger
-from src.common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
-from src.common.exceptions import A2ARPCError
+from common.logger import setup_logger
+from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
+from common.exceptions import A2ARPCError
 
 logger = setup_logger("a2a_server")
 

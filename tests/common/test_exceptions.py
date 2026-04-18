@@ -1,5 +1,5 @@
 import pytest
-from src.common.exceptions import A2ARPCError
+from common.exceptions import A2ARPCError
 
 def test_a2a_rpc_error_initialization():
     """Test that A2ARPCError initializes with correct fields."""

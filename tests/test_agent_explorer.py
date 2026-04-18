@@ -2,12 +2,12 @@
 
 import pytest
 import json
-from src.agent_explorer.tools import (
+from agent_explorer.tools import (
     search_destinations,
     get_activities,
     get_weather_forecast,
 )
-from src.agent_explorer.agent import agent
+from agent_explorer.agent import agent
 
 
 def test_search_destinations_all():
