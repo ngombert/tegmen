@@ -5,6 +5,7 @@ from typing import Optional
 import uuid
 
 from common.config import config
+from common.agent_registry import agent_registry
 
 from a2a.client.transports.jsonrpc import JsonRpcTransport
 from a2a.types import (
@@ -83,21 +84,18 @@ class RemoteAgentClient:
         await self.client.aclose()
 
 
-# Agent URLs configuration (from environment or defaults)
-AGENT_URLS = {
-    "gourmet": config.GOURMET_URL,
-    "acadomie": config.ACADOMIE_URL,
-    "explorer": config.EXPLORER_URL,
-}
+# Global client utilities
+# (AGENT_URLS removed, now handled by agent_registry)
 
 
 async def call_remote_agent(
     route: str, message: str, context_id: str | None = None
 ) -> str:
     """Call a remote agent by route name."""
-    url = AGENT_URLS.get(route)
+    # Resolve agent URL from registry
+    url = agent_registry.get_agent_url(route)
     if not url:
-        return f"Agent '{route}' non trouvé."
+        return f"Agent '{route}' non trouvé dans le registre."
 
     client = RemoteAgentClient(url)
     try:

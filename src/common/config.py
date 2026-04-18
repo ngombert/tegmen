@@ -32,9 +32,6 @@ class Settings:
 
     # Agent URLs (A2A Communication)
     MAESTRO_URL: str = os.getenv("MAESTRO_URL", "http://localhost:8000")
-    GOURMET_URL: str = os.getenv("GOURMET_URL", "http://localhost:8000")
-    ACADOMIE_URL: str = os.getenv("ACADOMIE_URL", "http://localhost:8000")
-    EXPLORER_URL: str = os.getenv("EXPLORER_URL", "http://localhost:8000")
 
 
 @lru_cache

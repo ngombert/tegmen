@@ -1,0 +1,30 @@
+# Catalogue des Agents Tegmen
+# Ce fichier est la source de vérité pour le routage sémantique et les URLs A2A.
+
+agents:
+  - name: gourmet
+    description: "Cuisine, recettes, menus et gestion de la cave"
+    url: "http://localhost:8001"
+    utterances:
+      - "Qu'est-ce qu'on mange ce soir ?"
+      - "Donne-moi une recette de lasagnes"
+      - "Ai-je encore du vin rouge en cave ?"
+      - "Propose moi un menu pour la semaine"
+
+  - name: acadomie
+    description: "École, devoirs, calendrier scolaire et apprentissage"
+    url: "http://localhost:8002"
+    utterances:
+      - "Quand a lieu le prochain conseil de classe ?"
+      - "Aide-moi pour mon exercice de maths"
+      - "Quels sont les devoirs pour demain ?"
+      - "Vérifie mon emploi du temps"
+
+  - name: explorer
+    description: "Voyages, sorties, activités culturelles et logistique"
+    url: "http://localhost:8003"
+    utterances:
+      - "Trouve-moi un vol pour Tokyo"
+      - "Qu'est-ce qu'on peut faire à Paris ce week-end ?"
+      - "Réserve un restaurant pour 4 personnes samedi"
+      - "Organise notre prochain voyage au ski"

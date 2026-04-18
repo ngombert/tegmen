@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from agent_explorer.agent import agent
 from common.a2a_server import create_a2a_app
 from common.config import config
+from common.agent_registry import agent_registry
 from common.logger import setup_logger
 from contextlib import asynccontextmanager
 
@@ -25,7 +26,7 @@ a2a_app = create_a2a_app(
     agent=agent,
     agent_name="agent_explorer",
     agent_description="Expert en voyages familiaux et activités de loisirs.",
-    public_url=config.EXPLORER_URL,
+    public_url=agent_registry.get_agent_url("explorer"),
     skills=[
         {
             "id": "travel",

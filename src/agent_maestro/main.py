@@ -11,7 +11,8 @@ from agent_maestro.router import classify_intent, warmup
 from agent_maestro.schemas import ChatRequest, ChatResponse, HealthResponse
 from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
 from common.config import config
-from common.a2a_client import call_remote_agent, AGENT_URLS
+from common.a2a_client import call_remote_agent
+from common.agent_registry import agent_registry
 from common.logger import setup_logger
 
 logger = setup_logger("maestro")
@@ -19,8 +20,8 @@ logger = setup_logger("maestro")
 
 # Initialized with Lean A2A standards
 
-# Check if running in microservices mode (agents are remote)
-MICROSERVICES_MODE = os.getenv("MICROSERVICES_MODE", "false").lower() == "true"
+# Maestro is now a pure A2A Gateway. 
+# It routes all non-native requests to specialized agents via A2A.
 
 
 @asynccontextmanager
@@ -30,12 +31,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"📦 Loading embedding model: {config.EMBEDDING_MODEL}")
     warmup()
     logger.info("✅ Semantic router ready!")
-    if MICROSERVICES_MODE:
-        logger.info("🔗 Microservices mode: Agents will be called via A2A")
-        for name, url in AGENT_URLS.items():
-            logger.info(f"   - {name}: {url}")
-    else:
-        logger.info("📦 Monolith mode: Agents loaded locally")
+    logger.info("🔗 A2A Gateway Mode: Agents loaded from registry")
+    for agent in agent_registry.list_agents():
+        logger.info(f"   - {agent['name']}: {agent['url']}")
     yield
     logger.info("👋 Shutting down Tegmen Maestro...")
 
@@ -110,7 +108,7 @@ async def chat(request: ChatRequest):
     agent_name = f"agent_{route}"
 
     try:
-        if MICROSERVICES_MODE and route != "unknown":
+        if route != "unknown":
             # Step 2a: Call remote agent via A2A
             response_text = await call_remote_agent(
                 route=route,
@@ -136,16 +134,8 @@ async def chat(request: ChatRequest):
 @app.get("/routes", tags=["System"], summary="Liste des agents et URLS")
 async def list_routes():
     """Liste les agents spécialisés disponibles et leurs descriptions."""
-    routes_info = [
-        {"name": "gourmet", "description": "Cuisine, recettes, menus"},
-        {"name": "acadomie", "description": "École, devoirs, calendrier scolaire"},
-        {"name": "explorer", "description": "Voyages, sorties, activités"},
-        {"name": "unknown", "description": "Questions générales (fallback)"},
-    ]
-
-    if MICROSERVICES_MODE:
-        for route in routes_info:
-            if route["name"] in AGENT_URLS:
-                route["url"] = AGENT_URLS[route["name"]]
-
-    return {"routes": routes_info, "microservices_mode": MICROSERVICES_MODE}
+    return {
+        "agents": agent_registry.list_agents(),
+        "gateway": "maestro",
+        "protocol": "A2A/JSON-RPC 2.0"
+    }

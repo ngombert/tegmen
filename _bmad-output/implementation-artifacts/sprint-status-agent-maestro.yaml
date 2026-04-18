@@ -45,10 +45,10 @@ development_status:
   # All epics, stories, and retrospectives in order
 
   # ── Epic 1: Fondation d'Accès et Couche d'Échange A2A ──────────────────────
-  epic-1: in-progress
-  1-1-librairie-commune-a2a-starter-template: review
-  1-2-creation-du-gateway-endpoint-public-maestro: review
-  1-3-auto-documentation-openapi-swagger: review
+  epic-1: done
+  1-1-librairie-commune-a2a-starter-template: done
+  1-2-creation-du-gateway-endpoint-public-maestro: done
+  1-3-auto-documentation-openapi-swagger: done
   epic-1-retrospective: optional
 
   # ── Epic 2: Bouclier de Contexte Actif et Confidentialité (Privacy) ─────────
@@ -59,8 +59,8 @@ development_status:
   epic-2-retrospective: optional
 
   # ── Epic 3: Routage Sémantique Intelligent In-Memory ───────────────────────
-  epic-3: backlog
-  3-0-registre-d-agents-config-driven-et-nettoyage: backlog
+  epic-3: in-progress
+  3-0-registre-d-agents-config-driven-et-nettoyage: done
   3-1-integration-modele-vectoriel-in-memory: backlog
   3-2-reception-et-routage-de-l-intention-dispatch-a2a: backlog
   3-3-gestion-d-incompetence-et-fallback-local: backlog

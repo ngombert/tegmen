@@ -27,70 +27,47 @@ def test_health_check():
 
 
 @patch("agent_maestro.main.classify_intent")
-def test_chat_routing_gourmet(mock_classify):
+@patch("agent_maestro.main.call_remote_agent")
+def test_chat_routing_gourmet(mock_call_remote, mock_classify):
     mock_classify.return_value = "gourmet"
+    mock_call_remote.return_value = "Mocked gourmet response"
 
-    # Mock specific internal logic depending on mode
-    # Test Monolith mode (default) logic
-    # We mock get_agent and Runner/session_service to avoid complex local agent setup
-    with (
-        patch("agent_maestro.main.MICROSERVICES_MODE", False),
-        patch("agent_maestro.agents.get_agent") as mock_get_agent,
-    ):
-        mock_agent = MagicMock()
-        mock_agent.name = "agent_gourmet"
-        mock_get_agent.return_value = mock_agent
+    response = client.post("/chat", json={"message": "Je veux des pâtes"})
 
-        response = client.post("/chat", json={"message": "Je veux des pâtes"})
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["agent"] == "agent_gourmet"
-        assert data["route"] == "gourmet"
-        assert "réessayer" in data["message"]
+    assert response.status_code == 200
+    data = response.json()
+    assert data["agent"] == "agent_gourmet"
+    assert data["route"] == "gourmet"
+    assert data["message"] == "Mocked gourmet response"
 
 
 @patch("agent_maestro.main.classify_intent")
 @patch("agent_maestro.main.call_remote_agent")
-def test_chat_microservices_gourmet(mock_call_remote, mock_classify):
+def test_chat_remote_error(mock_call_remote, mock_classify):
     mock_classify.return_value = "gourmet"
-    mock_call_remote.return_value = "Remote pasta recipe"
+    mock_call_remote.side_effect = Exception("Remote failure")
 
-    # Set MICROSERVICES_MODE to True
-    with patch("agent_maestro.main.MICROSERVICES_MODE", True):
-        response = client.post("/chat", json={"message": "Je veux des pâtes"})
+    response = client.post("/chat", json={"message": "Je veux des pâtes"})
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["agent"] == "agent_gourmet"
-        assert data["route"] == "gourmet"
-        assert data["message"] == "Remote pasta recipe"
-        mock_call_remote.assert_called_once()
+    assert response.status_code == 500
+    assert "Remote failure" in response.json()["detail"]
 
 
 @patch("agent_maestro.main.classify_intent")
 def test_chat_unknown_intent(mock_classify):
     mock_classify.return_value = "unknown"
 
-    with (
-        patch("agent_maestro.main.MICROSERVICES_MODE", False),
-        patch("agent_maestro.agents.get_agent") as mock_get_agent,
-    ):
-        mock_agent = MagicMock()
-        mock_agent.name = "agent_unknown"
-        mock_get_agent.return_value = mock_agent
+    response = client.post("/chat", json={"message": "blabla"})
 
-        response = client.post("/chat", json={"message": "blabla"})
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["route"] == "unknown"
-        assert "réessayer" in data["message"]
+    assert response.status_code == 200
+    data = response.json()
+    assert data["route"] == "unknown"
+    assert "réessayer" in data["message"]
 
 
 def test_routes_list():
     response = client.get("/routes")
     assert response.status_code == 200
     data = response.json()
-    assert "routes" in data
-    assert len(data["routes"]) >= 4
+    assert "agents" in data
+    assert len(data["agents"]) >= 3
