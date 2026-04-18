@@ -26,6 +26,10 @@ class Settings:
         "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
     )
 
+    # Security Configuration
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "dev-secret-keep-it-safe")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+
     # Application Configuration
     APP_NAME: str = "tegmen"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"

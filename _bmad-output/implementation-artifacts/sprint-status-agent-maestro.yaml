@@ -52,8 +52,8 @@ development_status:
   epic-1-retrospective: optional
 
   # ── Epic 2: Bouclier de Contexte Actif et Confidentialité (Privacy) ─────────
-  epic-2: backlog
-  2-1-authentification-stricte-et-validation-jwt: backlog
+  epic-2: in-progress
+  2-1-authentification-stricte-et-validation-jwt: done
   2-2-filtre-pii-et-telemetrie-d-audit: backlog
   2-3-hydratation-du-contexte-et-controle-parental-rbac: backlog
   epic-2-retrospective: optional

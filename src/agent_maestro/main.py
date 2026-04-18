@@ -4,7 +4,7 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from agent_maestro.router import classify_intent, warmup
@@ -13,6 +13,7 @@ from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
 from common.config import config
 from common.a2a_client import call_remote_agent
 from common.agent_registry import agent_registry
+from common.auth import get_current_identity
 from common.logger import setup_logger
 
 logger = setup_logger("maestro")
@@ -43,6 +44,7 @@ app = FastAPI(
     description="Assistant familial intelligent avec agents spécialisés (A2A)",
     version="0.1.0",
     lifespan=lifespan,
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
 app.add_middleware(
@@ -69,7 +71,10 @@ async def health_check():
         422: {"description": "Erreur de validation structurelle de la requête JSON-RPC"}
     }
 )
-async def route_request(request: JsonRpcRequest):
+async def route_request(
+    request: JsonRpcRequest,
+    identity: dict = Depends(get_current_identity)
+):
     """
     Endpoint principal du Gateway Maestro.
     
@@ -91,7 +96,10 @@ async def route_request(request: JsonRpcRequest):
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["Legacy"], summary="Vieux point d'entrée REST Chat")
-async def chat(request: ChatRequest):
+async def chat(
+    request: ChatRequest,
+    identity: dict = Depends(get_current_identity)
+):
     """
     Ancien endpoint de chat (Style REST).
     

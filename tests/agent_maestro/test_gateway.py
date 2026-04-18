@@ -1,6 +1,16 @@
 import pytest
+import jwt
 from httpx import AsyncClient, ASGITransport
 from agent_maestro.main import app
+from common.config import config
+
+def get_auth_headers():
+    token = jwt.encode(
+        {"family_id": "test-family", "user_id": "test-user"},
+        config.JWT_SECRET,
+        algorithm=config.JWT_ALGORITHM
+    )
+    return {"Authorization": f"Bearer {token}"}
 
 @pytest.mark.asyncio
 async def test_gateway_routing_success():
@@ -20,7 +30,11 @@ async def test_gateway_routing_success():
             },
             "id": "req-1"
         }
-        response = await ac.post("/api/v1/routing", json=payload)
+        response = await ac.post(
+            "/api/v1/routing", 
+            json=payload,
+            headers=get_auth_headers()
+        )
     
     assert response.status_code == 200
     data = response.json()
@@ -39,7 +53,11 @@ async def test_gateway_routing_invalid_payload():
             "params": {},
             "id": "req-2"
         }
-        response = await ac.post("/api/v1/routing", json=payload)
+        response = await ac.post(
+            "/api/v1/routing", 
+            json=payload,
+            headers=get_auth_headers()
+        )
     
     # FastAPI returns 422 Unprocessable Entity for Pydantic validation errors by default
     assert response.status_code == 422
