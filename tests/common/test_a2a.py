@@ -22,10 +22,10 @@ async def test_call_remote_agent_success(mock_client_cls):
     mock_client_instance = mock_client_cls.return_value
     mock_client_instance.aclose = AsyncMock()
 
-    # Setup A2AClient mock inside RemoteAgentClient
-    with patch("src.common.a2a_client.A2AClient") as MockA2AClient:
-        mock_a2a_instance = MockA2AClient.return_value
-        mock_a2a_instance.send_message = AsyncMock(return_value=mock_response_obj)
+    # Setup JsonRpcTransport mock inside RemoteAgentClient
+    with patch("src.common.a2a_client.JsonRpcTransport") as MockTransport:
+        mock_transport_instance = MockTransport.return_value
+        mock_transport_instance.send_message = AsyncMock(return_value=mock_response_obj.root.result)
 
         # Test valid route
         response = await call_remote_agent("gourmet", "Hello")

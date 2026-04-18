@@ -4,14 +4,12 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
 
 from src.agent_maestro.router import classify_intent, warmup
 from src.agent_maestro.schemas import ChatRequest, ChatResponse, HealthResponse
+from src.common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
 from src.common.config import config
 from src.common.a2a_client import call_remote_agent, AGENT_URLS
 from src.common.logger import setup_logger
@@ -19,8 +17,7 @@ from src.common.logger import setup_logger
 logger = setup_logger("maestro")
 
 
-# Session service for fallback Maestro agent
-session_service = InMemorySessionService()
+# Initialized with Lean A2A standards
 
 # Check if running in microservices mode (agents are remote)
 MICROSERVICES_MODE = os.getenv("MICROSERVICES_MODE", "false").lower() == "true"
@@ -65,6 +62,28 @@ async def health_check():
     return HealthResponse()
 
 
+@app.post("/api/v1/routing", response_model=JsonRpcResponse)
+async def route_request(request: JsonRpcRequest):
+    """
+    Main Gateway Routing Endpoint.
+    
+    Receives a standard JSON-RPC 2.0 request and routes it to the 
+    appropriate specialized agent based on semantic classification.
+    """
+    logger.info(f"📥 Received A2A routing request: method='{request.method}', id='{request.id}'")
+    
+    # Mock implementation for Story 1.2
+    # In Story 3.1, this will calls the real semantic router and specialized agents
+    return JsonRpcResponse(
+        jsonrpc="2.0",
+        result={
+            "message": "Message reçu par Maestro (Mock Gateway)",
+            "status": "routing_to_be_implemented_in_story_3"
+        },
+        id=request.id
+    )
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
@@ -81,6 +100,9 @@ async def chat(request: ChatRequest):
     route = classify_intent(request.message)
     logger.info(f"Routing decision: route='{route}' for message='{request.message}'")
 
+    response_text = ""
+    agent_name = f"agent_{route}"
+
     try:
         if MICROSERVICES_MODE and route != "unknown":
             # Step 2a: Call remote agent via A2A
@@ -90,45 +112,15 @@ async def chat(request: ChatRequest):
                 context_id=session_id,
             )
             agent_name = f"agent_{route}"
-        else:
-            # Step 2b: Use local fallback (Maestro or local agents)
-            from src.agent_maestro.agents import get_agent
+        if not response_text:
+            response_text = "Je n'ai pas pu traiter votre demande. Veuillez réessayer."
 
-            agent = get_agent(route)
-            agent_name = agent.name
-            user_id = request.user_id or "default_user"
-
-            session = await session_service.get_session(
-                app_name=config.APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-            )
-            if session is None:
-                session = await session_service.create_session(
-                    app_name=config.APP_NAME,
-                    user_id=user_id,
-                    session_id=session_id,
-                )
-
-            runner = Runner(
-                agent=agent,
-                app_name=config.APP_NAME,
-                session_service=session_service,
-            )
-
-            user_content = types.Content(
-                role="user", parts=[types.Part(text=request.message)]
-            )
-
-            response_text = ""
-            async for event in runner.run_async(
-                user_id=user_id,
-                session_id=session_id,
-                new_message=user_content,
-            ):
-                logger.info(f"Local Agent Event: {event}")
-                if event.is_final_response() and event.content and event.content.parts:
-                    response_text = event.content.parts[0].text
+        return ChatResponse(
+            message=response_text,
+            agent=agent_name,
+            session_id=session_id,
+            route=route,
+        )
 
         if not response_text:
             response_text = "Je n'ai pas pu traiter votre demande. Veuillez réessayer."

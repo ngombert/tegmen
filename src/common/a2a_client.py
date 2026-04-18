@@ -6,7 +6,7 @@ import uuid
 
 from src.common.config import config
 
-from a2a.client import A2AClient
+from a2a.client.transports.jsonrpc import JsonRpcTransport
 from a2a.types import (
     SendMessageRequest,
     Message,
@@ -31,8 +31,8 @@ class RemoteAgentClient:
     async def send_message(self, message: str, context_id: str | None = None) -> str:
         """Send a message to the remote agent and get response."""
 
-        # Create A2A client
-        a2a_client = A2AClient(httpx_client=self.client, url=self.agent_url)
+        # Use JsonRpcTransport directly to avoid A2AClient DeprecationWarning
+        transport = JsonRpcTransport(url=self.agent_url, httpx_client=self.client)
 
         # Create message
         text_part = TextPart(text=message)
@@ -42,51 +42,39 @@ class RemoteAgentClient:
             messageId=str(uuid.uuid4()),
         )
 
-        # Create request
-        request = SendMessageRequest(
-            id=str(uuid.uuid4()),
-            params=MessageSendParams(
-                message=msg,
-                contextId=context_id,
-            ),
+        # Create request params (the transport expects params, not the whole Request object)
+        params = MessageSendParams(
+            message=msg,
+            contextId=context_id,
         )
 
-        # Send and get response
-        response = await a2a_client.send_message(request)
+        # Send and get response result
+        # JsonRpcTransport.send_message returns the 'result' part of JSON-RPC directly
+        result = await transport.send_message(params)
 
-        # Extract text from response
-        # Extract text from response
-        # The SDK returns SendMessageResponse(root=Success|Error)
-        if hasattr(response, "root") and response.root:
-            # Check for error
-            if hasattr(response.root, "error"):
-                return f"Erreur agent: {response.root.error}"
+        # Extract text from response result
+        if result:
+            # Handle different response types (Message or Task)
+            if hasattr(result, "parts") and result.parts:
+                for part in result.parts:
+                    # Handle TextPart (nested root or direct)
+                    if hasattr(part, "root") and hasattr(part.root, "text"):
+                        return part.root.text
+                    if hasattr(part, "text"):
+                        return part.text
 
-            # Check for success result
-            if hasattr(response.root, "result"):
-                result = response.root.result
-
-                # Handle different response types (Message or Task)
-                if hasattr(result, "parts") and result.parts:
-                    for part in result.parts:
-                        # Handle TextPart (nested root or direct)
-                        if hasattr(part, "root") and hasattr(part.root, "text"):
-                            return part.root.text
-                        if hasattr(part, "text"):
-                            return part.text
-
-                if hasattr(result, "status") and hasattr(result, "artifacts"):
-                    # Task response - check for artifacts
-                    if result.artifacts:
-                        for artifact in result.artifacts:
-                            if artifact.parts:
-                                for part in artifact.parts:
-                                    if hasattr(part, "root") and hasattr(
-                                        part.root, "text"
-                                    ):
-                                        return part.root.text
-                                    if hasattr(part, "text"):
-                                        return part.text
+            if hasattr(result, "status") and hasattr(result, "artifacts"):
+                # Task response - check for artifacts
+                if result.artifacts:
+                    for artifact in result.artifacts:
+                        if artifact.parts:
+                            for part in artifact.parts:
+                                if hasattr(part, "root") and hasattr(
+                                    part.root, "text"
+                                ):
+                                    return part.root.text
+                                if hasattr(part, "text"):
+                                    return part.text
 
         return "Pas de réponse de l'agent."
 
