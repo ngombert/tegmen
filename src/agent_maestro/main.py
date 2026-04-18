@@ -14,6 +14,7 @@ from common.config import config
 from common.a2a_client import call_remote_agent
 from common.agent_registry import agent_registry
 from common.auth import get_current_identity
+from common.privacy import sanitize_message, log_audit_trail
 from common.logger import setup_logger
 
 logger = setup_logger("maestro")
@@ -83,6 +84,19 @@ async def route_request(
     """
     logger.info(f"📥 Received A2A routing request: method='{request.method}', id='{request.id}'")
     
+    # Apply PII filter if message is present in params
+    if request.params and "message" in request.params:
+        original_msg = request.params["message"]
+        request.params["message"] = sanitize_message(original_msg)
+        
+    # Audit Trail
+    log_audit_trail(
+        event_type="a2a_routing",
+        user_id=identity.get("user_id", "unknown"),
+        family_id=identity.get("family_id", "unknown"),
+        extra={"method": request.method, "rpc_id": str(request.id)}
+    )
+
     # Mock implementation for Story 1.2
     # In Story 3.1, this will calls the real semantic router and specialized agents
     return JsonRpcResponse(
@@ -107,10 +121,19 @@ async def chat(
     """
     session_id = request.session_id or str(uuid.uuid4())
 
+    # Step 0: Privacy & Audit
+    sanitized_message = sanitize_message(request.message)
+    log_audit_trail(
+        event_type="legacy_chat",
+        user_id=identity.get("user_id", "unknown"),
+        family_id=identity.get("family_id", "unknown"),
+        extra={"session_id": session_id}
+    )
+
     # Step 1: Classify intent with semantic router
-    logger.info(f"Processing message: '{request.message}'")
-    route = classify_intent(request.message)
-    logger.info(f"Routing decision: route='{route}' for message='{request.message}'")
+    logger.info(f"Processing message: '{sanitized_message}'")
+    route = classify_intent(sanitized_message)
+    logger.info(f"Routing decision: route='{route}' for message='{sanitized_message}'")
 
     response_text = ""
     agent_name = f"agent_{route}"
@@ -120,7 +143,7 @@ async def chat(
             # Step 2a: Call remote agent via A2A
             response_text = await call_remote_agent(
                 route=route,
-                message=request.message,
+                message=sanitized_message,
                 context_id=session_id,
             )
             agent_name = f"agent_{route}"
