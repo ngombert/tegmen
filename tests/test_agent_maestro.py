@@ -68,7 +68,7 @@ def test_chat_remote_error(mock_call_remote, mock_classify):
     )
 
     assert response.status_code == 500
-    assert "Remote failure" in response.json()["detail"]
+    assert "temporairement indisponible" in response.json()["detail"]
 
 
 @patch("agent_maestro.main.classify_intent")
@@ -84,7 +84,8 @@ def test_chat_unknown_intent(mock_classify):
     assert response.status_code == 200
     data = response.json()
     assert data["route"] == "unknown"
-    assert "réessayer" in data["message"]
+    assert data["agent"] == "maestro"
+    assert "agent Gourmet" in data["message"]  # From UNKNOWN_RESPONSE constant
 
 
 def test_chat_unauthorized():

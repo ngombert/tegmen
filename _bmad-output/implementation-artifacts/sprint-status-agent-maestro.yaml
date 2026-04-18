@@ -62,7 +62,7 @@ development_status:
   epic-3: in-progress
   3-0-registre-d-agents-config-driven-et-nettoyage: done
   3-1-integration-modele-vectoriel-in-memory: done
-  3-2-reception-et-routage-de-l-intention-dispatch-a2a: backlog
+  3-2-reception-et-routage-de-l-intention-dispatch-a2a: done
   3-3-gestion-d-incompetence-et-fallback-local: backlog
   epic-3-retrospective: optional
 

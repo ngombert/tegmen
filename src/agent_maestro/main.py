@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import random
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Depends
@@ -99,6 +100,22 @@ def check_agent_access(agent_name: str, context: RequestContext):
         )
 
 
+# Curated chitchat responses for Maestro's internal personality
+CHITCHAT_RESPONSES = [
+    "Bonjour ! Je suis Maestro, votre assistant familial. En quoi puis-je vous aider ?",
+    "Salut ! Je suis là pour vous aider avec la cuisine, les devoirs ou vos voyages !",
+    "Je suis Tegmen Maestro. Je peux vous connecter à nos agents spécialisés. 🎯",
+    "Ah, ça, c'est moi ! Dites-moi ce dont vous avez besoin, je m'occupe du reste.",
+    "La bonne humeur est ma spécialité ! Quel est votre besoin du moment ?",
+]
+
+UNKNOWN_RESPONSE = (
+    "Je n'ai pas compris votre demande. Je peux vous aider avec : "
+    "🍳 la cuisine (agent Gourmet), 📚 les devoirs (agent Acadomie), "
+    "🌍 les voyages (agent Explorer)."
+)
+
+
 @app.get("/health", response_model=HealthResponse, tags=["System"], summary="État de santé")
 async def health_check():
     """Vérifie que l'agent Maestro est en ligne et prêt à router."""
@@ -127,9 +144,10 @@ async def route_request(
     logger.info(f"📥 Received A2A routing request: method='{request.method}', user='{context.user_name}'")
     
     # Apply PII filter if message is present in params
+    message = ""
     if request.params and "message" in request.params:
-        original_msg = request.params["message"]
-        request.params["message"] = sanitize_message(original_msg)
+        message = sanitize_message(request.params["message"])
+        request.params["message"] = message
         
     # Audit Trail
     log_audit_trail(
@@ -139,16 +157,47 @@ async def route_request(
         extra={"method": request.method, "rpc_id": str(request.id), "role": context.role}
     )
 
-    # Mock implementation for Story 1.2
-    # In Story 3.1, this will calls the real semantic router and specialized agents
-    return JsonRpcResponse(
-        jsonrpc="2.0",
-        result={
-            "message": "Message reçu par Maestro (Mock Gateway)",
-            "status": "routing_to_be_implemented_in_story_3"
-        },
-        id=request.id
-    )
+    # Classify intent
+    route = classify_intent(message) if message else "unknown"
+    logger.info(f"🎯 Intent classified: route='{route}'")
+
+    # RBAC Check
+    check_agent_access(f"agent_{route}", context)
+
+    # Dispatch
+    try:
+        if route == "chitchat":
+            response_text = random.choice(CHITCHAT_RESPONSES)
+            agent_name = "maestro"
+        elif route == "unknown" or not message:
+            response_text = UNKNOWN_RESPONSE
+            agent_name = "maestro"
+        else:
+            response_text = await call_remote_agent(
+                route=route,
+                message=message,
+                context_id=str(request.id),
+            )
+            agent_name = f"agent_{route}"
+
+        return JsonRpcResponse(
+            jsonrpc="2.0",
+            result={"message": response_text, "agent": agent_name, "route": route},
+            id=request.id
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Dispatch error for route '{route}': {e}")
+        return JsonRpcResponse(
+            jsonrpc="2.0",
+            error=JsonRpcError(
+                code=-32603,
+                message=f"L'agent '{route}' est temporairement indisponible.",
+            ),
+            id=request.id
+        )
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["Legacy"], summary="Vieux point d'entrée REST Chat")
@@ -184,17 +233,20 @@ async def chat(
     agent_name = f"agent_{route}"
 
     try:
-        if route != "unknown":
-            # Step 2a: Call remote agent via A2A
+        if route == "chitchat":
+            response_text = random.choice(CHITCHAT_RESPONSES)
+            agent_name = "maestro"
+        elif route == "unknown":
+            response_text = UNKNOWN_RESPONSE
+            agent_name = "maestro"
+        else:
+            # Step 2: Call remote specialized agent via A2A
             response_text = await call_remote_agent(
                 route=route,
                 message=sanitized_message,
                 context_id=session_id,
             )
             agent_name = f"agent_{route}"
-            
-        if not response_text:
-            response_text = "Je n'ai pas pu traiter votre demande. Veuillez réessayer."
 
         return ChatResponse(
             message=response_text,
@@ -203,8 +255,11 @@ async def chat(
             route=route,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
+        logger.error(f"Dispatch error for route '{route}': {e}")
+        raise HTTPException(status_code=500, detail=f"Agent '{route}' est temporairement indisponible.")
 
 
 @app.get("/routes", tags=["System"], summary="Liste des agents et URLS")
