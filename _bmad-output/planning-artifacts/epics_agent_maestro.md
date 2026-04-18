@@ -58,10 +58,11 @@ NFR-REL-2 (Type Safety Contract): Tolérance zéro sur erreur A2A (Graceful Degr
 
 ### FR Coverage Map
 
-FR1: Epic 3 - Classification de l'intention textuelle
-FR2: Epic 3 - Analyse sémantique locale In-Memory
-FR3: Epic 3 - Transport vers l'agent spécialiste via A2A
-FR4: Epic 3 - Notification conversationnelle en cas de domaine non géré
+FR1: Epic 3 (Story 3.1) - Classification de l'intention textuelle
+FR2: Epic 3 (Story 3.1) - Analyse sémantique locale In-Memory
+FR3: Epic 3 (Story 3.2) - Transport vers l'agent spécialiste via A2A
+FR4: Epic 3 (Story 3.3) - Notification conversationnelle en cas de domaine non géré
+ADR-REGISTRY: Epic 3 (Story 3.0) - Registre config-driven des agents (config/agents.yaml). Suppression du couplage direct (agents.py) et du mode monolithe. Décision issue du Party Mode 2026-04-18.
 FR5: Epic 2 - Authentification de l'émetteur via JWT
 FR6: Epic 2 - Modification du payload avec le profil utilisateur
 FR7: Epic 2 - Respect des permissions/contrôle parental (RBAC)
@@ -85,7 +86,9 @@ La famille interagit de manière sécurisée ; les utilisateurs sont authentifi�
 
 ### Epic 3: Routage Sémantique Intelligent In-Memory
 L'utilisateur voit ses demandes comprises et automatiquement redirigées vers l'agent spécialiste compétent, sans délai perceptible.
-**FRs covered:** FR1, FR2, FR3, FR4
+**FRs covered:** FR1, FR2, FR3, FR4, ADR-REGISTRY
+
+> **ADR (Party Mode 2026-04-18) :** Cet Epic inclut une Story 3.0 de fondation qui introduit un registre d'agents config-driven (`config/agents.yaml` + `src/common/agent_registry.py`). Cette story supprime le fichier `src/agent_maestro/agents.py` (imports directs violant l'indépendance A2A), élimine le mode monolithe (`MICROSERVICES_MODE`), et nettoie les URLs hardcodées dans `config.py` et `a2a_client.py`. Le routeur sémantique (Story 3.1) et le dispatch A2A (Story 3.2) consomment ce registre comme source de vérité unique.
 
 ### Epic 4: Résilience Absolue et Dégradation Gracieuse
 L'utilisateur n'est jamais bloqué ou face à une erreur obscure ; le système gère instantanément les pannes internes par un retour clair (Zero-Blocking/Fail-Fast).
@@ -196,6 +199,49 @@ So that les agents spécialistes reçoivent un contexte complet et que les deman
 
 L'utilisateur voit ses demandes comprises et automatiquement redirigées vers l'agent spécialiste compétent, sans délai perceptible.
 
+> **ADR (Party Mode 2026-04-18) :** Cet Epic introduit le registre config-driven (`config/agents.yaml`) comme source de vérité unique pour le catalogue d'agents. Il supprime le couplage in-process hérité (imports directs dans `agents.py`, mode monolithe `MICROSERVICES_MODE`) au profit d'une architecture 100% microservices A2A.
+
+### Story 3.0: Registre d'Agents Config-Driven et Nettoyage du Couplage
+
+As a Développeur de l'écosystème Tegmen,
+I want un registre centralisé des agents chargé depuis un fichier de configuration externe (`config/agents.yaml`),
+So that l'ajout ou la suppression d'un agent ne nécessite aucune modification du code source de Maestro.
+
+**Contexte (ADR Party Mode 2026-04-18) :**
+L'implémentation actuelle de l'Epic 1 a introduit un couplage in-process direct (`src/agent_maestro/agents.py` importait les modules Python des sous-agents), violant la règle topologique A2A. Le mode `MICROSERVICES_MODE` toggle et le dictionnaire `AGENT_URLS` hardcodé dans `a2a_client.py` encodaient en dur la liste des agents dans le code source. Cette story corrige ces violations en introduisant un registre config-driven comme fondation de l'Epic 3.
+
+**Acceptance Criteria:**
+
+**Scénario 1 — Chargement du registre :**
+
+**Given** le fichier `config/agents.yaml` contenant la définition d'au moins un agent (nom, description, URL, utterances sémantiques)
+**When** Maestro démarre
+**Then** `src/common/agent_registry.py` charge et valide la configuration via un modèle Pydantic `AgentConfig`
+**And** expose les fonctions `get_agent_url(route)`, `list_agents()` et `get_agent_utterances(route)` consommables par le routeur et le client A2A.
+
+**Scénario 2 — Fail-Fast sur config invalide :**
+
+**Given** un fichier `config/agents.yaml` absent, vide ou contenant un schéma invalide (ex: URL manquante, utterances vides)
+**When** Maestro tente de démarrer
+**Then** le démarrage échoue immédiatement avec un message d'erreur explicite indiquant le problème de configuration
+**And** aucun trafic n'est servi avant validation complète.
+
+**Scénario 3 — Override par variable d'environnement :**
+
+**Given** le YAML définit `url: http://localhost:8001` pour l'agent gourmet
+**When** la variable d'environnement `AGENT_GOURMET_URL` est définie à `http://agent-gourmet:8000`
+**Then** l'URL effective utilisée par le registre est celle de la variable d'environnement (priorité env > YAML).
+
+**Scénario 4 — Nettoyage du code hérité :**
+
+**Given** le registre config-driven opérationnel
+**When** la story est terminée
+**Then** le fichier `src/agent_maestro/agents.py` est supprimé (code mort)
+**And** les variables `GOURMET_URL`, `ACADOMIE_URL`, `EXPLORER_URL` sont retirées de `src/common/config.py`
+**And** le dictionnaire `AGENT_URLS` hardcodé est retiré de `src/common/a2a_client.py` au profit d'un appel au registre
+**And** le toggle `MICROSERVICES_MODE` et la logique de branchement associée sont retirés de `src/agent_maestro/main.py`
+**And** l'endpoint `/routes` de `main.py` consomme le registre pour lister dynamiquement les agents.
+
 ### Story 3.1: Intégration Modèle Vectoriel In-Memory
 
 As a Architecte Système,
@@ -206,8 +252,9 @@ So that je puisse classifier les requêtes sans Cloud LLM de tierce partie et sa
 
 **Given** la phase de démarrage de FastAPI
 **When** l'initialisation du Routeur Sémantique démarre
-**Then** l'espace vectoriel des "Cartes d'identité des Agents" est chargé 
-**And** cela est exécuté via l'offload asynchrone sans monopoliser le fil conducteur principal (Testé et certifié).
+**Then** les routes sémantiques sont construites **dynamiquement** à partir des utterances fournies par le registre d'agents (`agent_registry.get_agent_utterances()`)
+**And** l'espace vectoriel est chargé en mémoire via l'offload asynchrone sans monopoliser le fil conducteur principal (Testé et certifié)
+**And** aucune utterance n'est hardcodée dans le code source de `router.py`.
 
 ### Story 3.2: Réception et Routage de l'Intention (Dispatch A2A)
 
@@ -218,8 +265,8 @@ So that Maestro identifie l'agent spécialiste et transmette la réponse via le 
 **Acceptance Criteria:**
 
 **Given** une requête autorisée, profilée et traitée sémantiquement
-**When** le score match avec un agent précis (Gourmet, Acadomie)
-**Then** Maestro exécute l'appel `A2AClient` vers l'endpoint JSON-RPC de ce sous-réseau
+**When** le score match avec un agent précis
+**Then** Maestro résout l'URL de l'agent via le registre (`agent_registry.get_agent_url()`) et exécute l'appel `A2AClient` vers l'endpoint JSON-RPC correspondant
 **And** transmet de manière transparente le résultat conversationnel de fin vers l'utilisateur.
 
 ### Story 3.3: Gestion d'Incompétence et Fallback Local

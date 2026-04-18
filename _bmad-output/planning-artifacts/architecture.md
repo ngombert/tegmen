@@ -93,6 +93,8 @@ Tous les agents devront s'aligner sur :
 - `src/agent_NAME/app/api/routers/` pour l'exposition du protocole A2A.
 - `src/agent_NAME/app/schemas/` pour les contrats Pydantic.
 - `src/common/a2a_server.py|a2a_client.py` pour mutualiser la topologie réseau de l'écosystème.
+- `src/common/agent_registry.py` pour le registre centralisé config-driven des agents (source de vérité : `config/agents.yaml`).
+- `config/agents.yaml` (hors `src/`) comme fichier de configuration externe définissant le catalogue d'agents (URLs, descriptions, utterances sémantiques).
 
 **Development Experience:**
 Redémarrages chauds via `uvicorn --reload`, documentation intra-nœuds auto-générée via OpenAPI/Swagger pour faciliter la validation visuelle des JSON-RPC par l'équipe, intégration `litellm` décorrélée des abstractions lourdes d'état de session.
@@ -196,6 +198,8 @@ tegmen/
 ├── docker-compose.yml       # Maillage réseau inter-agents
 ├── pyproject.toml           # Gestion globale des dépendances Python (uv)
 ├── uv.lock                  # Verrouillage exact ASGI/LiteLLM/Pydantic
+├── config/
+│   └── agents.yaml          # Registre config-driven des agents (URLs, utterances)
 ├── .github/
 │   └── workflows/
 │       └── ci.yml           # CI avec tests hors-réseau (pytest-httpx)
@@ -205,6 +209,7 @@ tegmen/
 │   ├── common/              # [CROSS-CUTTING] Librairie partagée
 │   │   ├── a2a_server.py    # Standardisation de l'API FastAPI A2A
 │   │   ├── a2a_client.py    # Client HTTPX asynchrone générique
+│   │   ├── agent_registry.py # Registre config-driven (charge config/agents.yaml)
 │   │   ├── security.py      # Middleware & validation JWT mutualisés
 │   │   ├── exceptions.py    # Exceptions "Graceful" (A2ARPCError)
 │   │   └── schemas.py       # Pydantic génériques et Payload contextuel
@@ -246,6 +251,7 @@ tegmen/
 **API Boundaries (Network Confinement):**
 - **External Frontier:** Seul le port de `src/agent_maestro/` est exposé au réseau de l'hôte public (et au `web-client`). Il porte la responsabilité intégrale du filtrage AuthZ/AuthN.
 - **Internal A2A Boundary:** Les nœuds spécialisés (`gourmet`, `acadomie`) opèrent dans des sous-réseaux virtuels Docker fermés et ne servent que des réponses JSON-RPC conformes en provenance d'un tunnel certifié inter-microservices (`maestro`).
+- **Agent Independence (ADR 2026-04-18) :** Maestro ne possède aucun import Python direct vers les modules des sous-agents. L'indépendance est garantie par un registre config-driven (`config/agents.yaml`) chargé au démarrage par `src/common/agent_registry.py`. Le mode monolithe (imports in-process) est formellement interdit. L'ajout d'un agent se fait exclusivement par configuration, sans modification du code source de Maestro. L'auto-discovery dynamique via Agent Cards A2A (`.well-known/agent.json`) est reportée post-MVP.
 
 **Data & State Boundaries (Schema-per-Service):**
 - **Souveraineté des Données :** Le cluster PostgreSQL est logiquement cloisonné (Schema-per-service). Maestro opère un schéma maître (utilisateurs, sessions, PII, RBAC). Chaque sous-agent possède et migre (via Alembic) son propre schéma de données purement métier (ex: le schéma *Gourmet* pour les recettes de familles privées).
