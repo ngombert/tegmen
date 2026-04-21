@@ -19,6 +19,7 @@ from common.privacy import sanitize_message, log_audit_trail
 from common.users import get_user_profile
 from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError, RequestContext
 from common.logger import setup_logger
+from common.tracing import setup_tracing, instrument_app, instrument_client
 
 logger = setup_logger("maestro")
 
@@ -32,6 +33,10 @@ logger = setup_logger("maestro")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events."""
+    if config.OTEL_ENABLED:
+        setup_tracing("maestro", config.OTEL_EXPORTER_OTLP_ENDPOINT)
+        instrument_client()
+        
     logger.info("🚀 Starting Tegmen Maestro...")
     logger.info(f"📦 Loading embedding model: {config.EMBEDDING_MODEL}")
     warmup()
@@ -50,6 +55,9 @@ app = FastAPI(
     lifespan=lifespan,
     swagger_ui_parameters={"persistAuthorization": True},
 )
+
+if config.OTEL_ENABLED:
+    instrument_app(app)
 
 app.add_middleware(
     CORSMiddleware,

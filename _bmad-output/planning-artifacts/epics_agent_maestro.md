@@ -311,3 +311,41 @@ So that je reçoive une phrase d'explication douce de la part du bot.
 **When** le système cherche à retourner l'erreur au client appelant
 **Then** un exception_handler global FastAPI capture l'erreur
 **And** substitue le code d'erreur standard 500 par une réponse JSON-RPC contextuelle courtoise expliquant momentanément l'indisponibilité.
+
+### Story 4.3: Instrumentation OpenTelemetry
+
+As a Ingénieur SRE / Architecte,
+I want instrumenter Maestro et ses clients A2A avec le standard OpenTelemetry,
+So that toutes les requêtes puissent être tracées de bout en bout avec des standards du marché.
+
+**Acceptance Criteria:**
+
+**Given** une requête entrante sur Maestro
+**When** le système traite la requête
+**Then** des spans OpenTelemetry sont générées pour chaque étape clé (Auth, Privacy, Routing, A2A Call)
+**And** le contexte de trace (trace_id) est propagé dans les headers JSON-RPC vers les agents spécialistes.
+
+### Story 4.4: Diagnostic Trace Path
+
+As a Administrateur (Nicolas),
+I want visualiser le chemin détaillé d'une requête (Trace Path) dans la réponse API (en mode debug),
+So that je puisse comprendre exactement pourquoi un agent a été choisi et quels outils ont été utilisés.
+
+**Acceptance Criteria:**
+
+**Given** une requête effectuée par un administrateur avec un flag de debug/trace activé
+**When** Maestro retourne la réponse
+**Then** la réponse contient un bloc `debug_info` ou `trace_path` détaillant les scores de confiance, l'agent cible et les éventuels échecs de routage.
+
+### Story 4.5: Optimisation Linguistique French-First
+
+As a Famille Francophone,
+I want un routage sémantique optimisé pour la langue française,
+So that mes intentions soient mieux comprises sans ambiguïté linguistique.
+
+**Acceptance Criteria:**
+
+**Given** une intention exprimée en français avec des nuances ou des termes familiers
+**When** le routeur sémantique évalue la requête
+**Then** le score de confiance pour l'agent approprié est significativement supérieur à celui obtenu avec un modèle purement anglais
+**And** le système utilise un modèle d'embedding optimisé pour le français (ex: MiniLM-L12 multilingue ou E5-multilingual).

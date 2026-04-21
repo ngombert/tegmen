@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse
 from common.logger import setup_logger
 from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
 from common.exceptions import A2ARPCError
+from common.config import config
+from common.tracing import setup_tracing, instrument_app, instrument_client
 
 logger = setup_logger("a2a_server")
 
@@ -68,6 +70,12 @@ def create_a2a_app(
     )
 
     server = A2AServer(agent_name)
+
+    # Instrument app and client if OTEL is enabled
+    if config.OTEL_ENABLED:
+        setup_tracing(agent_name, config.OTEL_EXPORTER_OTLP_ENDPOINT)
+        instrument_app(app)
+        instrument_client()
 
     @app.post("/a2a/SendMessage")
     async def send_message(rpc_request: JsonRpcRequest) -> JsonRpcResponse:

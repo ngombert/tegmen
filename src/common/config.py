@@ -23,12 +23,16 @@ class Settings:
 
     # Semantic Router Configuration
     EMBEDDING_MODEL: str = os.getenv(
-        "EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
+        "EMBEDDING_MODEL", "intfloat/multilingual-e5-small" #"sentence-transformers/all-MiniLM-L6-v2"
     )
 
     # Security Configuration
     JWT_SECRET: str = os.getenv("JWT_SECRET", "dev-secret-keep-it-safe")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+
+    # OpenTelemetry Configuration
+    OTEL_ENABLED: bool = os.getenv("OTEL_ENABLED", "true").lower() == "true"
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
     # Application Configuration
     APP_NAME: str = "tegmen"

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-18T11:25:30+02:00
-last_updated: 2026-04-18T17:38:00+02:00
+last_updated: 2026-04-21T20:18:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -59,15 +59,18 @@ development_status:
   epic-2-retrospective: optional
 
   # ── Epic 3: Routage Sémantique Intelligent In-Memory ───────────────────────
-  epic-3: in-progress
+  epic-3: done
   3-0-registre-d-agents-config-driven-et-nettoyage: done
   3-1-integration-modele-vectoriel-in-memory: done
   3-2-reception-et-routage-de-l-intention-dispatch-a2a: done
   3-3-gestion-d-incompetence-et-fallback-local: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # ── Epic 4: Résilience Absolue et Dégradation Gracieuse ────────────────────
-  epic-4: backlog
-  4-1-disjoncteur-temporel-fail-fast: backlog
-  4-2-interception-gracieuse-et-conversationnelle: backlog
+  epic-4: in-progress
+  4-1-disjoncteur-temporel-fail-fast: ready-for-dev
+  4-2-interception-gracieuse-et-conversationnelle: ready-for-dev
+  4-3-observabilite-opentelemetry: done
+  4-4-diagnostic-trace-path: ready-for-dev
+  4-5-optimisation-linguistique-fr: ready-for-dev
   epic-4-retrospective: optional
