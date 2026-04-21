@@ -123,12 +123,49 @@ UNKNOWN_RESPONSE = (
     "🌍 les voyages (agent Explorer)."
 )
 
+# Friendly fallback responses for when specialized agents fail
+FALLBACK_RESPONSES = [
+    "Désolé, l'agent spécialisé semble faire une petite pause... Je ne peux pas lui parler pour le moment. 😴",
+    "Oups ! J'ai un petit souci technique pour joindre mon collègue. On réessaie dans un instant ? 🛠️",
+    "Mince, la connexion avec l'agent spécialisé a été coupée. Je suis navré de ce contretemps ! 🔌",
+    "Je n'arrive pas à obtenir de réponse de l'agent pour le moment. Je reste à votre disposition pour autre chose ! ✨",
+]
+
 # Template for ambiguous intents
 CLARIFICATION_TEMPLATE = (
     "Je ne suis pas sûr de bien comprendre... 🧐\n"
     "Voulez-vous parler à l'agent **{agent_display}** ?\n\n"
     "(Si oui, soyez un peu plus précis dans votre demande !)"
 )
+
+from common.exceptions import A2ARPCError
+
+@app.exception_handler(A2ARPCError)
+async def a2a_exception_handler(request: Request, exc: A2ARPCError):
+    """
+    Global handler for A2A errors to provide a graceful conversational fallback.
+    Returns a 200 OK with a friendly message in the result.
+    """
+    logger.error(f"Graceful Interception | A2A Error {exc.code}: {exc.message}")
+    
+    # We try to extract the original RPC ID if possible from the request
+    rpc_id = None
+    try:
+        body = await request.json()
+        rpc_id = body.get("id")
+    except:
+        pass
+
+    return JsonRpcResponse(
+        jsonrpc="2.0",
+        result={
+            "message": random.choice(FALLBACK_RESPONSES),
+            "agent": "maestro",
+            "route": "error_fallback",
+            "technical_error": f"Error {exc.code}" # Hidden but available in JSON if needed
+        },
+        id=rpc_id
+    )
 
 
 @app.get("/health", response_model=HealthResponse, tags=["System"], summary="État de santé")
@@ -203,22 +240,29 @@ async def route_request(
             agent_name = "maestro"
             route = "unknown" # Normalize for response
 
+    except A2ARPCError as e:
+        # Let the global exception handler handle it if it bubbles up, 
+        # or handle it here for direct JSON-RPC compliance
+        logger.warning(f"A2A Failure for route '{route}': {e}")
         return JsonRpcResponse(
             jsonrpc="2.0",
-            result={"message": response_text, "agent": agent_name, "route": route},
+            result={
+                "message": random.choice(FALLBACK_RESPONSES),
+                "agent": "maestro",
+                "route": route,
+                "error_code": e.code
+            },
             id=request.id
         )
-
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Dispatch error for route '{route}': {e}")
+        logger.error(f"Unexpected dispatch error for route '{route}': {e}")
         return JsonRpcResponse(
             jsonrpc="2.0",
-            error=JsonRpcError(
-                code=-32603,
-                message=f"L'agent '{route}' est temporairement indisponible.",
-            ),
+            result={
+                "message": "Désolé, j'ai rencontré une erreur inattendue. 🙊",
+                "agent": "maestro",
+                "route": "error"
+            },
             id=request.id
         )
 
@@ -282,11 +326,22 @@ async def chat(
             route=route,
         )
 
-    except HTTPException:
-        raise
+    except A2ARPCError as e:
+        logger.warning(f"Legacy Chat A2A Failure: {e}")
+        return ChatResponse(
+            message=random.choice(FALLBACK_RESPONSES),
+            agent="maestro",
+            session_id=session_id,
+            route=route,
+        )
     except Exception as e:
-        logger.error(f"Dispatch error for route '{route}': {e}")
-        raise HTTPException(status_code=500, detail=f"Agent '{route}' est temporairement indisponible.")
+        logger.error(f"Legacy Chat unexpected error: {e}")
+        return ChatResponse(
+            message="Oups, j'ai un petit souci technique. 🙊",
+            agent="maestro",
+            session_id=session_id,
+            route="error",
+        )
 
 
 @app.get("/routes", tags=["System"], summary="Liste des agents et URLS")
