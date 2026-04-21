@@ -1,23 +1,22 @@
 # Family-Agents (Tegmen)
 
-Une équipe d'agents IA autonomes pour assister la famille au quotidien.
+Une équipe d'agents IA autonomes pour assister la famille au quotidien. Ce projet implémente un orchestrateur (Maestro) capable de router intelligemment les demandes vers des agents spécialisés via le protocole A2A.
 
 ## 🏗 Architecture
 
 Le projet est conçu comme un ensemble de **microservices** communiquant via le protocole **A2A (Agent-to-Agent)**.
 
 ### Les Agents
-*   **🎹 Maestro (Gateway)** : Le point d'entrée unique. Il analyse l'intention de l'utilisateur (via Semantic Router) et délègue la tâche à l'agent approprié.
+*   **🎹 Maestro (Gateway)** : Le point d'entrée unique. Il analyse l'intention de l'utilisateur (via Semantic Router optimisé pour le français) et délègue la tâche à l'agent approprié.
 *   **🍳 Gourmet** : Spécialiste culinaire (Recettes, listes de courses).
 *   **🎓 Acadomie** : Assistant scolaire (Emploi du temps, notes, aide aux devoirs).
 *   **🌍 Explorer** : Expert voyage et loisirs (Destinations, activités, météo).
 
-### Stack Technique
-*   **Langage** : Python 3.12+
-*   **Gestionnaire de paquets** : `uv`
-*   **IA** : Google ADK, LiteLLM, Semantic Router
-*   **Base de données** : PostgreSQL (Async SQLAlchemy)
-*   **Infra** : Docker & Docker Compose
+### Fonctionnalités Clés
+*   **Routage Sémantique Local** : Utilisation de `multilingual-e5-small` en mémoire pour une classification rapide et privée.
+*   **Privacy-First** : Cavardage automatique des PII (données personnelles) dans tous les journaux.
+*   **Contrôle Parental (RBAC)** : Filtrage des requêtes basé sur le profil utilisateur (ex: restrictions enfants).
+*   **Résilience & Observabilité** : Instrumentation OpenTelemetry complète, Timeouts SLA, et dégradation gracieuse en cas de panne d'un agent.
 
 ## 🚀 Démarrage Rapide
 
@@ -54,24 +53,16 @@ Le projet est conçu comme un ensemble de **microservices** communiquant via le 
 Pour s'assurer que tout fonctionne (tests unitaires, routage, et communication inter-agents), utilisez le script global :
 
 ```bash
-./scripts/verify_all.py
+PYTHONPATH=src uv run python3 scripts/verify_all.py
 ```
-
-Ce script exécute :
-1.  Les tests unitaires (`pytest`)
-2.  La vérification du routeur sémantique
-3.  Un test d'intégration A2A (Maestro -> Gourmet)
 
 ### Exécuter les tests manuellement
 
 Pour lancer les tests avec le rapport de couverture :
 
 ```bash
-PYTHONPATH=. uv run --with pytest-cov pytest --cov=src --cov-report=term-missing tests/
+PYTHONPATH=src uv run pytest tests/ -vv
 ```
-
-## 📚 Documentation
-*   [Protocole A2A](docs/A2A.md) : Détails sur la communication entre agents.
 
 ## 📂 Structure du Projet
 ```
@@ -80,5 +71,9 @@ src/
 ├── agent_gourmet/   # Microservice Cuisine
 ├── agent_acadomie/  # Microservice Scolaire
 ├── agent_explorer/  # Microservice Voyage
-└── common/          # Code partagé (DB, A2A, Config)
+├── common/          # Code partagé (DB, A2A, Config, Auth)
+└── web-client/      # (Optionnel) Interface web simplifiée
 ```
+
+---
+*Projet finalisé - Epic 4 terminée avec succès.*
