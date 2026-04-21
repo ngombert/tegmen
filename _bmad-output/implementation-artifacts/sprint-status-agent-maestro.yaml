@@ -71,6 +71,6 @@ development_status:
   4-1-disjoncteur-temporel-fail-fast: done
   4-2-interception-gracieuse-et-conversationnelle: done
   4-3-observabilite-opentelemetry: done
-  4-4-diagnostic-trace-path: ready-for-dev
+  4-4-diagnostic-trace-path: done
   4-5-optimisation-linguistique-fr: ready-for-dev
   epic-4-retrospective: optional

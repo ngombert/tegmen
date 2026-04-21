@@ -94,6 +94,34 @@ def warmup() -> None:
     _ = classify_intent("test")
     logger.info("Semantic router warmup complete.")
 
+def get_all_scores(message: str) -> dict[str, float]:
+    """
+    Get maximum similarity scores for all registered routes.
+    """
+    if not message:
+        return {}
+        
+    router_inst = get_router()
+    # Encode message
+    v = router_inst._encode([message], input_type='queries')
+    # Query index (get enough results to cover all routes)
+    scores, routes = router_inst.index.query(v[0], top_k=100)
+    
+    route_scores = {}
+    for r, s in zip(routes, scores):
+        route_name = str(r)
+        score = float(s)
+        # Keep the best score for each route
+        if route_name not in route_scores or score > route_scores[route_name]:
+            route_scores[route_name] = score
+            
+    # Add routes that might have 0 score if not in top_k
+    for route in router_inst.routes:
+        if route.name not in route_scores:
+            route_scores[route.name] = 0.0
+            
+    return route_scores
+
 def reload_router() -> None:
     """
     Rebuild the router if the registry has changed.

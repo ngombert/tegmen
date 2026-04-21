@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
-from agent_maestro.router import classify_intent, warmup, THRESHOLD_ROUTING, THRESHOLD_CLARIFICATION
+from agent_maestro.router import classify_intent, get_all_scores, warmup, THRESHOLD_ROUTING, THRESHOLD_CLARIFICATION
 from agent_maestro.schemas import ChatRequest, ChatResponse, HealthResponse
 from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError
 from common.config import config
@@ -216,7 +216,36 @@ async def route_request(
     # RBAC Check
     check_agent_access(f"agent_{route}", context)
 
+    # Check for debug mode (admin only)
+    is_admin = context.role == "parent"
+    debug_requested = request.params.get("debug", False) if request.params else False
+    include_debug = is_admin and debug_requested
+
     # Dispatch logic based on confidence thresholds
+    debug_info = None
+    if include_debug:
+        debug_info = {
+            "routing": {
+                "route": route,
+                "score": score,
+                "thresholds": {
+                    "routing": THRESHOLD_ROUTING,
+                    "clarification": THRESHOLD_CLARIFICATION
+                },
+                "all_scores": get_all_scores(message)
+            },
+            "context": {
+                "user_role": context.role,
+                "family_id": context.family_id
+            }
+        }
+        # Add trace ID if OTEL is enabled
+        if config.OTEL_ENABLED:
+            from opentelemetry import trace
+            span = trace.get_current_span()
+            if span:
+                debug_info["trace_id"] = format(span.get_span_context().trace_id, '032x')
+
     try:
         if route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
@@ -240,29 +269,43 @@ async def route_request(
             agent_name = "maestro"
             route = "unknown" # Normalize for response
 
+        result_payload = {"message": response_text, "agent": agent_name, "route": route}
+        if debug_info:
+            result_payload["_debug"] = debug_info
+
+        return JsonRpcResponse(
+            jsonrpc="2.0",
+            result=result_payload,
+            id=request.id
+        )
+
     except A2ARPCError as e:
         # Let the global exception handler handle it if it bubbles up, 
         # or handle it here for direct JSON-RPC compliance
         logger.warning(f"A2A Failure for route '{route}': {e}")
+        result_payload = {
+            "message": random.choice(FALLBACK_RESPONSES),
+            "agent": "maestro",
+            "route": route,
+            "error_code": e.code
+        }
+        if debug_info:
+            result_payload["_debug"] = debug_info
+
         return JsonRpcResponse(
             jsonrpc="2.0",
-            result={
-                "message": random.choice(FALLBACK_RESPONSES),
-                "agent": "maestro",
-                "route": route,
-                "error_code": e.code
-            },
+            result=result_payload,
             id=request.id
         )
     except Exception as e:
         logger.error(f"Unexpected dispatch error for route '{route}': {e}")
+        result_payload = {"message": response_text, "agent": agent_name, "route": route}
+        if debug_info:
+            result_payload["_debug"] = debug_info
+
         return JsonRpcResponse(
             jsonrpc="2.0",
-            result={
-                "message": "Désolé, j'ai rencontré une erreur inattendue. 🙊",
-                "agent": "maestro",
-                "route": "error"
-            },
+            result=result_payload,
             id=request.id
         )
 
