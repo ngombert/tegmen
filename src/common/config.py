@@ -40,6 +40,7 @@ class Settings:
 
     # Agent URLs (A2A Communication)
     MAESTRO_URL: str = os.getenv("MAESTRO_URL", "http://localhost:8000")
+    DEFAULT_A2A_TIMEOUT: float = float(os.getenv("DEFAULT_A2A_TIMEOUT", "5.0"))
 
 
 @lru_cache

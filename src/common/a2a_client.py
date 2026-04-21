@@ -6,7 +6,9 @@ import uuid
 
 from common.config import config
 from common.agent_registry import agent_registry
+from common.exceptions import A2ARPCError
 
+from a2a.client.errors import A2AClientTimeoutError, A2AClientHTTPError
 from a2a.client.transports.jsonrpc import JsonRpcTransport
 from a2a.types import (
     SendMessageRequest,
@@ -20,20 +22,23 @@ from a2a.types import (
 class RemoteAgentClient:
     """Client for communicating with remote A2A agents."""
 
-    def __init__(self, agent_url: str, httpx_client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, agent_url: str, httpx_client: httpx.AsyncClient | None = None, timeout: float | None = None) -> None:
         """Initialize client with agent base URL."""
         self.agent_url = agent_url.rstrip("/")
-        # Configure httpx client with base_url and SLA timeout (Story 4.1)
+        # Configure httpx client with base_url and SLA timeout
+        actual_timeout = timeout if timeout is not None else config.DEFAULT_A2A_TIMEOUT
         self.client = httpx_client or httpx.AsyncClient(
             base_url=self.agent_url, 
-            timeout=5.0
+            timeout=actual_timeout
         )
 
     async def send_message(self, message: str, context_id: str | None = None) -> str:
         """Send a message to the remote agent and get response."""
 
         # Use JsonRpcTransport directly to avoid A2AClient DeprecationWarning
-        transport = JsonRpcTransport(url=self.agent_url, httpx_client=self.client)
+        # The agent_url is the base URL, we need to point to the specific endpoint
+        endpoint_url = f"{self.agent_url}/a2a/SendMessage"
+        transport = JsonRpcTransport(url=endpoint_url, httpx_client=self.client)
 
         # Create message
         text_part = TextPart(text=message)
@@ -50,8 +55,31 @@ class RemoteAgentClient:
         )
 
         # Send and get response result
-        # JsonRpcTransport.send_message returns the 'result' part of JSON-RPC directly
-        result = await transport.send_message(params)
+        try:
+            # JsonRpcTransport.send_message returns the 'result' part of JSON-RPC directly
+            result = await transport.send_message(params)
+        except (httpx.TimeoutException, A2AClientTimeoutError):
+            raise A2ARPCError(
+                code=A2ARPCError.TIMEOUT,
+                message=f"L'agent à l'URL {self.agent_url} n'a pas répondu dans le délai imparti."
+            )
+        except A2AClientHTTPError as e:
+            # Check if it's a network-level timeout wrapped in a 503 by the SDK
+            err_msg = str(e).lower()
+            if "timed out" in err_msg or "too slow" in err_msg or "timeout" in err_msg:
+                raise A2ARPCError(
+                    code=A2ARPCError.TIMEOUT,
+                    message=f"L'agent à l'URL {self.agent_url} a rencontré une erreur de communication (délai dépassé)."
+                )
+            raise A2ARPCError(
+                code=A2ARPCError.INTERNAL_ERROR,
+                message=f"Erreur HTTP lors de l'appel A2A vers {self.agent_url}: {str(e)}"
+            )
+        except Exception as e:
+            raise A2ARPCError(
+                code=A2ARPCError.INTERNAL_ERROR,
+                message=f"Erreur interne lors de l'appel A2A vers {self.agent_url}: {str(e)}"
+            )
 
         # Extract text from response result
         if result:
@@ -89,7 +117,7 @@ class RemoteAgentClient:
 
 
 async def call_remote_agent(
-    route: str, message: str, context_id: str | None = None
+    route: str, message: str, context_id: str | None = None, timeout: float | None = None
 ) -> str:
     """Call a remote agent by route name."""
     # Resolve agent URL from registry
@@ -97,7 +125,7 @@ async def call_remote_agent(
     if not url:
         return f"Agent '{route}' non trouvé dans le registre."
 
-    client = RemoteAgentClient(url)
+    client = RemoteAgentClient(url, timeout=timeout)
     try:
         return await client.send_message(message, context_id)
     finally:

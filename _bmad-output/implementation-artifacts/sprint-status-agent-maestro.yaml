@@ -68,7 +68,7 @@ development_status:
 
   # ── Epic 4: Résilience Absolue et Dégradation Gracieuse ────────────────────
   epic-4: in-progress
-  4-1-disjoncteur-temporel-fail-fast: ready-for-dev
+  4-1-disjoncteur-temporel-fail-fast: done
   4-2-interception-gracieuse-et-conversationnelle: ready-for-dev
   4-3-observabilite-opentelemetry: done
   4-4-diagnostic-trace-path: ready-for-dev

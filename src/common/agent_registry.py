@@ -64,6 +64,15 @@ class AgentRegistry:
             logger.error(f"Failed to load agent registry: {str(e)}")
             raise RuntimeError(f"Critical configuration error: {str(e)}")
 
+    def register_agent(self, name: str, url: str, description: str = "", utterances: List[str] = None):
+        """Register an agent dynamically (mainly for testing)."""
+        self._agents[name] = AgentConfig(
+            name=name,
+            url=url,
+            description=description,
+            utterances=utterances or []
+        )
+
     def get_agent_url(self, name: str) -> Optional[str]:
         """Get the effective URL for a given agent."""
         agent = self._agents.get(name)
