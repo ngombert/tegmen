@@ -24,7 +24,7 @@ async def test_remote_agent_client_injection():
 async def test_remote_agent_client_send_message_success(httpx_mock):
     """Test successful message sending."""
     httpx_mock.add_response(
-        url="http://agent-test",
+        url="http://agent-test/a2a/SendMessage",
         json={
             "jsonrpc": "2.0",
             "result": {

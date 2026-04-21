@@ -109,11 +109,12 @@ async def test_gateway_routing_agent_error_returns_json_rpc_error(mock_classify,
             headers=get_auth_headers()
         )
 
-    assert response.status_code == 200  # JSON-RPC errors are still HTTP 200
+    assert response.status_code == 200  # Graceful degradation
     data = response.json()
-    assert "error" in data
-    assert data["error"]["code"] == -32603
-    assert "indisponible" in data["error"]["message"]
+    assert "result" in data
+    assert data["result"]["route"] == "gourmet"
+    assert data["result"]["agent"] == "maestro"
+    assert any(word in data["result"]["message"].lower() for word in ["désolé", "oups", "mince"])
 
 
 @pytest.mark.asyncio

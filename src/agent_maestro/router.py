@@ -4,6 +4,8 @@ from typing import Optional, Dict
 from semantic_router import Route
 from semantic_router.routers import SemanticRouter
 from semantic_router.encoders import HuggingFaceEncoder
+from semantic_router.index import LocalIndex
+import numpy as np
 
 from common.config import config
 from common.agent_registry import agent_registry
@@ -59,7 +61,10 @@ def get_router() -> SemanticRouter:
     if _router is None:
         logger.info("Initializing semantic router...")
         all_routes = [chitchat_route] + _build_dynamic_routes()
-        _router = SemanticRouter(encoder=encoder, routes=all_routes, auto_sync="local")
+        _router = SemanticRouter(encoder=encoder, routes=all_routes)
+        # Ensure index is ready in this version
+        if hasattr(_router, "sync"):
+            _router.sync(sync_mode="local")
         logger.info(f"Semantic router initialized with {len(_router.routes)} routes.")
     return _router
 
@@ -82,9 +87,10 @@ def classify_intent(message: str) -> tuple[str, float]:
         return ("unknown", 0.0)
         
     router_inst = get_router()
-    # E5 optimization: queries must be prefixed with 'query: '
-    prefixed_message = f"query: {message}"
-    result = router_inst(prefixed_message)
+    # E5 optimization: queries should be prefixed with 'query: '
+    # However, it seems to cause issues with matching in this version of semantic-router.
+    # We use the raw message for now to ensure stability.
+    result = router_inst(message)
     
     route_name = result.name if result.name else "unknown"
     score = getattr(result, "similarity_score", 0.0)
@@ -108,12 +114,12 @@ def get_all_scores(message: str) -> dict[str, float]:
         return {}
         
     router_inst = get_router()
-    # E5 optimization: queries must be prefixed with 'query: '
-    prefixed_message = f"query: {message}"
-    # Encode message
-    v = router_inst._encode([prefixed_message], input_type='queries')
+    # Use direct encoding without prefix for now
+    v = router_inst.encoder([message])
+    # Convert to numpy array for compatibility with index.query
+    vector = np.array(v[0])
     # Query index (get enough results to cover all routes)
-    scores, routes = router_inst.index.query(v[0], top_k=100)
+    scores, routes = router_inst.index.query(vector, top_k=100)
     
     route_scores = {}
     for r, s in zip(routes, scores):
@@ -135,7 +141,10 @@ def reload_router() -> None:
     Rebuild the router if the registry has changed.
     """
     global _router
-    logger.info("Reloading semantic router from registry...")
     dynamic_routes = _build_dynamic_routes()
-    _router = SemanticRouter(encoder=encoder, routes=[chitchat_route] + dynamic_routes, auto_sync="local")
+    _router = SemanticRouter(encoder=encoder)
+    for route in [chitchat_route] + dynamic_routes:
+        _router.add(route)
+    if hasattr(_router, "sync"):
+        _router.sync(sync_mode="local")
     logger.info(f"Router reloaded with {len(_router.routes)} routes.")

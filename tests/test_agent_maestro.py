@@ -67,8 +67,12 @@ def test_chat_remote_error(mock_call_remote, mock_classify):
         headers=get_auth_headers()
     )
 
-    assert response.status_code == 500
-    assert "temporairement indisponible" in response.json()["detail"]
+    assert response.status_code == 200
+    data = response.json()
+    assert data["agent"] == "maestro"
+    assert data["route"] == "gourmet"
+    # The message should be one of our friendly fallback responses
+    assert any(word in data["message"].lower() for word in ["désolé", "oups", "mince"])
 
 
 @patch("agent_maestro.main.classify_intent")

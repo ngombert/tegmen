@@ -297,9 +297,16 @@ async def route_request(
             result=result_payload,
             id=request.id
         )
+    except HTTPException:
+        # Re-raise HTTPExceptions (401, 403, etc.) so FastAPI can handle them
+        raise
     except Exception as e:
         logger.error(f"Unexpected dispatch error for route '{route}': {e}")
-        result_payload = {"message": response_text, "agent": agent_name, "route": route}
+        result_payload = {
+            "message": random.choice(FALLBACK_RESPONSES), 
+            "agent": "maestro", 
+            "route": route
+        }
         if debug_info:
             result_payload["_debug"] = debug_info
 
@@ -383,7 +390,7 @@ async def chat(
             message="Oups, j'ai un petit souci technique. 🙊",
             agent="maestro",
             session_id=session_id,
-            route="error",
+            route=route,
         )
 
 
