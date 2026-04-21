@@ -18,12 +18,15 @@ encoder = HuggingFaceEncoder(name=config.EMBEDDING_MODEL)
 chitchat_route = Route(
     name="chitchat",
     utterances=[
-        "Bonjour", "Salut", "Comment ça va ?",
+        "Bonjour", "Salut", "Coucou", "Hello", "Ça va ?", "Comment ça va ?",
+        "Ça gaze ?", "Bien le bonjour",
         "Raconte-moi une blague", "Quelle est la météo ?",
-        "Qui es-tu ?", "Tu t'appelles comment ?",
-        "Merci", "Au revoir",
+        "Qui es-tu ?", "Tu t'appelles comment ?", "C'est quoi ton nom ?",
+        "Merci", "Merci beaucoup", "C'est gentil", "De rien",
+        "Au revoir", "À plus tard", "À bientôt", "Bonne soirée",
         "Quelle est la capitale de la France ?",
-        "Parle-moi de toi", "Bonne nuit",
+        "Parle-moi de toi", "Tu sais faire quoi ?",
+        "Bonne nuit", "Fais de beaux rêves",
     ],
 )
 
@@ -61,8 +64,9 @@ def get_router() -> SemanticRouter:
     return _router
 
 # Confidence Thresholds
-THRESHOLD_ROUTING = 0.30      # Full confidence
-THRESHOLD_CLARIFICATION = 0.15 # Ambiguous - ask for clarification
+# Optimized for multilingual-e5-small (which tends to have higher similarity scores)
+THRESHOLD_ROUTING = 0.40      # Full confidence (increased from 0.30)
+THRESHOLD_CLARIFICATION = 0.20 # Ambiguous (increased from 0.15)
 
 def classify_intent(message: str) -> tuple[str, float]:
     """
@@ -78,7 +82,9 @@ def classify_intent(message: str) -> tuple[str, float]:
         return ("unknown", 0.0)
         
     router_inst = get_router()
-    result = router_inst(message)
+    # E5 optimization: queries must be prefixed with 'query: '
+    prefixed_message = f"query: {message}"
+    result = router_inst(prefixed_message)
     
     route_name = result.name if result.name else "unknown"
     score = getattr(result, "similarity_score", 0.0)
@@ -102,8 +108,10 @@ def get_all_scores(message: str) -> dict[str, float]:
         return {}
         
     router_inst = get_router()
+    # E5 optimization: queries must be prefixed with 'query: '
+    prefixed_message = f"query: {message}"
     # Encode message
-    v = router_inst._encode([message], input_type='queries')
+    v = router_inst._encode([prefixed_message], input_type='queries')
     # Query index (get enough results to cover all routes)
     scores, routes = router_inst.index.query(v[0], top_k=100)
     

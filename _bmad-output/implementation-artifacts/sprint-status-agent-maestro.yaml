@@ -67,10 +67,10 @@ development_status:
   epic-3-retrospective: done
 
   # ── Epic 4: Résilience Absolue et Dégradation Gracieuse ────────────────────
-  epic-4: in-progress
+  epic-4: done
   4-1-disjoncteur-temporel-fail-fast: done
   4-2-interception-gracieuse-et-conversationnelle: done
   4-3-observabilite-opentelemetry: done
   4-4-diagnostic-trace-path: done
-  4-5-optimisation-linguistique-fr: ready-for-dev
+  4-5-optimisation-linguistique-fr: done
   epic-4-retrospective: optional
