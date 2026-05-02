@@ -56,12 +56,13 @@ def create_a2a_app(
     skills: list[dict],
     public_url: str,
     version: str = "0.1.0",
-) -> FastAPI:
+    methods: dict[str, Callable] | None = None,
+) -> Any: # Returns FastAPI app, but can return (app, server) if needed. 
     """
     Create a Lean A2A FastAPI application for an agent.
     
-    NOTE: This replaces the legacy ADK-based version. 
-    ADKAgentExecutor is removed as part of the transition to a pure FastAPI/Pydantic stack.
+    Returns the FastAPI application. 
+    Methods can be passed during creation or registered later if the server instance is accessed.
     """
     app = FastAPI(
         title=agent_name,
@@ -70,6 +71,11 @@ def create_a2a_app(
     )
 
     server = A2AServer(agent_name)
+    
+    # Register initial methods if provided
+    if methods:
+        for name, func in methods.items():
+            server.register_method(name, func)
 
     # Instrument app and client if OTEL is enabled
     if config.OTEL_ENABLED:
@@ -93,5 +99,7 @@ def create_a2a_app(
             "skills": skills
         }
 
-    # Helper to return the app (compatible with mount points)
+    # We attach the server to the app state so it can be retrieved if needed
+    app.state.a2a_server = server
+
     return app

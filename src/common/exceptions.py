@@ -14,6 +14,9 @@ class A2ARPCError(Exception):
     TIMEOUT = -32000
     AGENT_UNAVAILABLE = -32001
 
+    # Domain-specific error codes (Agent Gourmet)
+    RECIPE_NOT_FOUND = -32010
+
     def __init__(self, code: int, message: str, data: dict | None = None) -> None:
         self.code = code
         self.message = message

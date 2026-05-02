@@ -139,12 +139,14 @@ PYTHONPATH=. uv run --with pytest-cov pytest tests/agent_maestro/ --cov=src.agen
 
 ## 🐳 Docker
 
-```bash
-# Build standalone
-docker build -f src/agent_maestro/Dockerfile -t tegmen-maestro .
+Maestro est intégré au `docker-compose.yml` racine via les **Docker Profiles**.
 
-# Run
-docker run -p 8000:8000 --env-file .env tegmen-maestro
+```bash
+# Lancer Maestro (active automatiquement les agents requis si non lancés)
+docker compose --profile maestro up
+
+# Lancer uniquement Maestro (si les agents tournent déjà ailleurs)
+docker compose up -d maestro
 ```
 
 ---
