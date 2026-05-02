@@ -83,3 +83,35 @@ def test_a2a_search_invalid_params(client):
     data = response.json()
     assert "error" in data
     assert data["error"]["code"] == -32602  # INVALID_PARAMS
+
+def test_a2a_search_complex_filters(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "search_recipes",
+        "params": {
+            "tags_include": ["italien"],
+            "max_prep_time": 30
+        },
+        "id": "test-complex"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    data = response.json()
+    assert data["result"]["total_count"] == 1
+    assert data["result"]["results"][0]["name"] == "Pâtes Carbonara"
+
+def test_a2a_search_pagination(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "search_recipes",
+        "params": {
+            "limit": 1,
+            "offset": 1
+        },
+        "id": "test-pag"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    data = response.json()
+    assert data["result"]["total_count"] == 4
+    assert len(data["result"]["results"]) == 1
+    # First is Carbonara, second (offset 1) is Poulet Rôti
+    assert data["result"]["results"][0]["name"] == "Poulet Rôti"

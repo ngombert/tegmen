@@ -46,7 +46,7 @@ development_status:
   epic-1: in-progress
   1-1-fondation-a2a-et-structure-agent-gourmet: done
   1-2-recherche-de-recettes-basique: done
-  1-3-filtres-avances-et-pagination: backlog
+  1-3-filtres-avances-et-pagination: done
   epic-1-retrospective: optional
 
   # Epic 2: Consultation Détaillée d'une Recette

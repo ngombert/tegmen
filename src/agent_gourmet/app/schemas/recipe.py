@@ -31,7 +31,13 @@ class SearchRequest(BaseModel):
     model_config = ConfigDict(strict=True)
     
     query: str = ""
-    tag: str | None = None
+    tag: str | None = None # legacy, tags_include preferred
+    tags_include: list[str] | None = None
+    tags_exclude: list[str] | None = None
+    ingredients_exclude: list[str] | None = None
+    max_prep_time: int | None = None
+    limit: int = 10
+    offset: int = 0
 
 class SearchResponse(BaseModel):
     """Response schema for recipe search."""

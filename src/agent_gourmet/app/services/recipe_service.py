@@ -84,41 +84,73 @@ class RecipeService:
 
     async def search_recipes(self, request: SearchRequest) -> SearchResponse:
         """
-        Search for recipes based on query and/or tag.
+        Search for recipes based on multiple filters and pagination.
         
         Args:
-            request: Search parameters
+            request: Search parameters and filters
             
         Returns:
-            Search results matching criteria
+            Paginated search results matching all criteria
         """
-        results: list[RecipeBase] = []
+        matches: list[RecipeBase] = []
         query = request.query.lower().strip()
-        tag = request.tag.lower().strip() if request.tag else None
+        
+        # Normalize filter inputs
+        tags_inc = [t.lower() for t in request.tags_include] if request.tags_include else []
+        if request.tag: # Backward compatibility
+            tags_inc.append(request.tag.lower())
+            
+        tags_exc = [t.lower() for t in request.tags_exclude] if request.tags_exclude else []
+        ing_exc = [i.lower() for i in request.ingredients_exclude] if request.ingredients_exclude else []
 
         for recipe in RECIPES_DB:
-            # Check tag filter
-            if tag and tag not in [t.lower() for t in recipe.tags]:
+            # 1. Filter by prep time
+            if request.max_prep_time and recipe.prep_time > request.max_prep_time:
                 continue
+                
+            # 2. Filter by tags_include (ALL must be present)
+            if tags_inc:
+                recipe_tags = [t.lower() for t in recipe.tags]
+                if not all(t in recipe_tags for t in tags_inc):
+                    continue
             
-            # Check query matches name or ingredients
-            if not query:
-                results.append(RecipeBase(**recipe.model_dump()))
-                continue
+            # 3. Filter by tags_exclude (NONE must be present)
+            if tags_exc:
+                recipe_tags = [t.lower() for t in recipe.tags]
+                if any(t in recipe_tags for t in tags_exc):
+                    continue
             
-            match_found = False
-            if query in recipe.name.lower():
-                match_found = True
-            else:
-                for ing in recipe.ingredients:
-                    if query in ing.name.lower():
-                        match_found = True
+            # 4. Filter by ingredients_exclude
+            if ing_exc:
+                recipe_ing_names = [i.name.lower() for i in recipe.ingredients]
+                excluded_found = False
+                for excluded_ing in ing_exc:
+                    if any(excluded_ing in ri for ri in recipe_ing_names):
+                        excluded_found = True
                         break
+                if excluded_found:
+                    continue
             
-            if match_found:
-                results.append(RecipeBase(**recipe.model_dump()))
+            # 5. Filter by query (matches name OR any ingredient)
+            if query:
+                match_found = query in recipe.name.lower()
+                if not match_found:
+                    for ing in recipe.ingredients:
+                        if query in ing.name.lower():
+                            match_found = True
+                            break
+                if not match_found:
+                    continue
+            
+            # If we reached here, the recipe matches all criteria
+            matches.append(RecipeBase(**recipe.model_dump()))
 
-        return SearchResponse(results=results, total_count=len(results))
+        total_count = len(matches)
+        
+        # Apply pagination
+        results = matches[request.offset : request.offset + request.limit]
+        
+        return SearchResponse(results=results, total_count=total_count)
 
     async def get_recipe_details(self, recipe_id: str) -> RecipeDetail:
         """

@@ -65,3 +65,50 @@ async def test_search_recipes_combined(service):
     response = await service.search_recipes(request)
     assert response.total_count == 1
     assert response.results[0].name == "Poulet Rôti"
+
+@pytest.mark.asyncio
+async def test_search_filters_tags(service):
+    # Multiple tags (AND logic)
+    request = SearchRequest(tags_include=["italien", "pâtes"])
+    response = await service.search_recipes(request)
+    assert response.total_count == 1
+    assert response.results[0].name == "Pâtes Carbonara"
+
+@pytest.mark.asyncio
+async def test_search_filters_exclusions(service):
+    # Exclude tags
+    request = SearchRequest(query="poulet", tags_exclude=["familial"])
+    response = await service.search_recipes(request)
+    assert response.total_count == 1
+    assert response.results[0].name == "Salade César"
+
+    # Exclude ingredients
+    # 'pâtes' is in Carbonara. 
+    # Let's search all recipes but exclude those with 'pecorino' (Carbonara)
+    request = SearchRequest(ingredients_exclude=["pecorino"])
+    response = await service.search_recipes(request)
+    assert response.total_count == 3 # All except Carbonara
+    assert not any(r.name == "Pâtes Carbonara" for r in response.results)
+
+@pytest.mark.asyncio
+async def test_search_filters_prep_time(service):
+    # Max prep time 20 mins
+    request = SearchRequest(max_prep_time=20)
+    response = await service.search_recipes(request)
+    assert response.total_count == 2 # Carbonara (20) and Salade César (15)
+    
+@pytest.mark.asyncio
+async def test_search_pagination(service):
+    # Request all recipes but limit to 2
+    request = SearchRequest(limit=2)
+    response = await service.search_recipes(request)
+    assert response.total_count == 4 # Total available matches
+    assert len(response.results) == 2 # Paginated results
+    
+    # Check offset
+    request = SearchRequest(limit=2, offset=2)
+    response = await service.search_recipes(request)
+    assert response.total_count == 4
+    assert len(response.results) == 2
+    # Carbonara(0), Poulet(1), César(2), Ratatouille(3)
+    assert response.results[0].name == "Salade César"
