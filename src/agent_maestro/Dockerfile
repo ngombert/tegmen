@@ -30,12 +30,12 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # 5. On copie le code source APRÈS les dépendances
 # Si tu modifies ton code, seule cette étape est refaite (très rapide)
-COPY src/common ./src/common
-COPY src/agent_maestro ./src/agent_maestro
+COPY src/common ./common
+COPY src/agent_maestro ./agent_maestro
 
 # Configuration
 ENV PYTHONPATH=/app
 EXPOSE 8000
 
 # Lancement direct (plus rapide, moins de mémoire)
-CMD ["uvicorn", "src.agent_maestro.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "agent_maestro.main:app", "--host", "0.0.0.0", "--port", "8000"]
