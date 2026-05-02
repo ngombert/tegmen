@@ -136,12 +136,14 @@ PYTHONPATH=. uv run --with pytest-cov pytest tests/{module_name}/ --cov=src.{mod
 
 ## 🐳 Docker
 
-```bash
-# Build standalone
-docker build -f src/{module_name}/Dockerfile -t tegmen-{agent_name} .
+L'agent est intégré au `docker-compose.yml` racine via les **Docker Profiles**.
 
-# Run
-docker run -p {PORT}:{PORT} --env-file .env tegmen-{agent_name}
+```bash
+# Lancer uniquement cet agent (avec la DB)
+docker compose --profile {nom_profile} up
+
+# Lancer en arrière-plan
+docker compose up -d {nom_service_docker}
 ```
 
 ---

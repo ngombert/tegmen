@@ -129,12 +129,14 @@ PYTHONPATH=. uv run --with pytest-cov pytest tests/{module_name}/ --cov=src.{mod
 
 ## 🐳 Docker
 
-```bash
-# Build standalone
-docker build -f src/{module_name}/Dockerfile -t tegmen-{agent_name} .
+Le Gateway est intégré au `docker-compose.yml` racine via les **Docker Profiles**.
 
-# Run
-docker run -p {PORT}:{PORT} --env-file .env tegmen-{agent_name}
+```bash
+# Lancer le Gateway (active automatiquement les agents requis)
+docker compose --profile {nom_profile} up
+
+# Lancer uniquement le service Gateway (si les agents tournent déjà)
+docker compose up -d {nom_service_docker}
 ```
 
 ---

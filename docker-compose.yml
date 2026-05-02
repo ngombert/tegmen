@@ -30,6 +30,7 @@ services:
       context: .
       dockerfile: src/agent_gourmet/Dockerfile
     container_name: tegmen-agent-gourmet
+    profiles: ["gourmet", "all", "agents"]
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://gourmet:gourmet@db:5432/gourmet
@@ -47,6 +48,7 @@ services:
       context: .
       dockerfile: src/agent_acadomie/Dockerfile
     container_name: tegmen-agent-acadomie
+    profiles: ["acadomie", "all", "agents"]
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://acadomie:acadomie@db:5432/acadomie
@@ -64,6 +66,7 @@ services:
       context: .
       dockerfile: src/agent_explorer/Dockerfile
     container_name: tegmen-agent-explorer
+    profiles: ["explorer", "all", "agents"]
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://explorer:explorer@db:5432/explorer
@@ -81,6 +84,7 @@ services:
       context: .
       dockerfile: src/agent_maestro/Dockerfile
     container_name: tegmen-maestro
+    profiles: ["maestro", "all"]
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://maestro:maestro@db:5432/maestro
@@ -91,12 +95,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      gourmet:
-        condition: service_started
-      acadomie:
-        condition: service_started
-      explorer:
-        condition: service_started
     ports:
       - "8000:8000"
     volumes:
@@ -108,6 +106,7 @@ services:
       context: src/web-client
       dockerfile: Dockerfile
     container_name: tegmen-frontend
+    profiles: ["frontend", "all"]
     environment:
       - MAESTRO_API_URL=${MAESTRO_API_URL:-http://localhost:8000}
     ports:

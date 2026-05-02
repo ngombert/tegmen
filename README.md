@@ -39,10 +39,27 @@ Le projet est conçu comme un ensemble de **microservices** communiquant via le 
     ```
 
 3.  **Lancer les services**
-    ```bash
-    docker-compose up --build
-    ```
-    Les agents seront accessibles sur :
+
+    Le projet utilise des **Docker Profiles** pour vous permettre de lancer uniquement les briques nécessaires à votre travail :
+
+    *   **Infrastructure seule (Base de données) :**
+        ```bash
+        docker compose up -d db
+        ```
+    *   **Un agent spécifique (ex: Gourmet) :**
+        ```bash
+        docker compose --profile gourmet up
+        ```
+    *   **Le Gateway Maestro (active automatiquement les agents requis) :**
+        ```bash
+        docker compose --profile maestro up
+        ```
+    *   **L'ensemble du système (Tous les agents + Frontend) :**
+        ```bash
+        docker compose --profile all up
+        ```
+
+    Les services sont accessibles sur :
     *   Maestro : http://localhost:8000
     *   Gourmet : http://localhost:8001
     *   Acadomie : http://localhost:8002
