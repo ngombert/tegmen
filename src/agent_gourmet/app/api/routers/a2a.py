@@ -3,6 +3,9 @@ from common.logger import setup_logger
 from agent_gourmet.app.services.recipe_service import RecipeService
 from agent_gourmet.app.schemas.recipe import SearchRequest
 
+from pydantic import ValidationError
+from common.exceptions import A2ARPCError
+
 logger = setup_logger("gourmet_a2a")
 recipe_service = RecipeService()
 
@@ -10,15 +13,21 @@ async def handle_search_recipes(params: dict[str, Any] | None) -> dict[str, Any]
     """Handler for search_recipes JSON-RPC method."""
     logger.info(f"A2A | search_recipes called with params: {params}")
     
-    # Validate and parse params
-    request_data = params or {}
-    request = SearchRequest(**request_data)
-    
-    # Call service
-    response = await recipe_service.search_recipes(request)
-    
-    # Return serializable dict
-    return response.model_dump()
+    try:
+        # Validate and parse params
+        request_data = params or {}
+        request = SearchRequest(**request_data)
+        
+        # Call service
+        response = await recipe_service.search_recipes(request)
+        
+        # Return serializable dict
+        return response.model_dump()
+    except ValidationError as e:
+        raise A2ARPCError(
+            code=A2ARPCError.INVALID_PARAMS,
+            message=f"Paramètres invalides : {str(e)}"
+        )
 
 async def handle_get_recipe_details(params: dict[str, Any] | None) -> dict[str, Any]:
     """Handler for get_recipe_details JSON-RPC method."""

@@ -38,6 +38,15 @@ class A2AServer:
         try:
             result = await handler(request.params)
             return JsonRpcResponse(id=request.id, result=result)
+        except A2ARPCError as e:
+            return JsonRpcResponse(
+                id=request.id,
+                error=JsonRpcError(
+                    code=e.code,
+                    message=e.message,
+                    data=e.data
+                )
+            )
         except Exception as e:
             logger.error(f"Error executing method {request.method}: {e}")
             return JsonRpcResponse(

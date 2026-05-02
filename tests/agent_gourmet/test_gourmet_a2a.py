@@ -45,3 +45,41 @@ def test_a2a_direct_search(client):
     data = response.json()
     assert "result" in data
     assert data["result"]["total_count"] == 1
+
+def test_a2a_search_empty_result(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "search_recipes",
+        "params": {"query": "xyzzy_introuvable"},
+        "id": "test-empty"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    data = response.json()
+    assert "result" in data
+    assert data["result"]["total_count"] == 0
+    assert data["result"]["results"] == []
+
+def test_a2a_search_by_ingredient(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "search_recipes",
+        "params": {"query": "pecorino"},
+        "id": "test-ing"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    data = response.json()
+    assert "result" in data
+    assert data["result"]["total_count"] >= 1
+    assert any("carbonara" in r["name"].lower() for r in data["result"]["results"])
+
+def test_a2a_search_invalid_params(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "search_recipes",
+        "params": {"query": 123},  # strict=True on SearchRequest
+        "id": "test-invalid"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    data = response.json()
+    assert "error" in data
+    assert data["error"]["code"] == -32602  # INVALID_PARAMS

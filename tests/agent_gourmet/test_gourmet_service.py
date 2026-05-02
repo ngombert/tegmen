@@ -42,3 +42,26 @@ async def test_get_recipe_details_not_found(service):
     with pytest.raises(A2ARPCError) as excinfo:
         await service.get_recipe_details("999")
     assert excinfo.value.code == A2ARPCError.RECIPE_NOT_FOUND
+
+@pytest.mark.asyncio
+async def test_search_recipes_by_ingredient(service):
+    request = SearchRequest(query="pecorino")
+    response = await service.search_recipes(request)
+    assert response.total_count >= 1
+    assert any("carbonara" in r.name.lower() for r in response.results)
+
+@pytest.mark.asyncio
+async def test_search_recipes_empty_result(service):
+    request = SearchRequest(query="xyzzy")
+    response = await service.search_recipes(request)
+    assert response.total_count == 0
+    assert response.results == []
+
+@pytest.mark.asyncio
+async def test_search_recipes_combined(service):
+    # 'poulet' is in 'Poulet Rôti' (tags: familial, dimanche, poulet) 
+    # and 'Salade César' (tags: frais, salade, entrée)
+    request = SearchRequest(query="poulet", tag="dimanche")
+    response = await service.search_recipes(request)
+    assert response.total_count == 1
+    assert response.results[0].name == "Poulet Rôti"
