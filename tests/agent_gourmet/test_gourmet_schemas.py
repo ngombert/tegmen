@@ -58,3 +58,26 @@ def test_search_response_valid():
     resp = SearchResponse(results=[recipe], total_count=1)
     assert resp.total_count == 1
     assert len(resp.results) == 1
+
+def test_recipe_detail_request_valid():
+    from agent_gourmet.app.schemas.recipe import RecipeDetailRequest
+    req = RecipeDetailRequest(recipe_id="123")
+    assert req.recipe_id == "123"
+
+def test_recipe_detail_request_strict():
+    from agent_gourmet.app.schemas.recipe import RecipeDetailRequest
+    with pytest.raises(ValidationError):
+        RecipeDetailRequest(recipe_id=123) # Should fail (strict str)
+
+def test_recipe_detail_response_valid():
+    from agent_gourmet.app.schemas.recipe import RecipeDetailResponse, RecipeDetail, Ingredient
+    detail = RecipeDetail(
+        id="1",
+        name="Test",
+        tags=["a"],
+        prep_time=10,
+        ingredients=[Ingredient(name="i")],
+        steps=["s"]
+    )
+    resp = RecipeDetailResponse(recipe=detail)
+    assert resp.recipe.id == "1"

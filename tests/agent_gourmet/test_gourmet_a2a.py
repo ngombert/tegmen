@@ -115,3 +115,51 @@ def test_a2a_search_pagination(client):
     assert len(data["result"]["results"]) == 1
     # First is Carbonara, second (offset 1) is Poulet Rôti
     assert data["result"]["results"][0]["name"] == "Poulet Rôti"
+
+def test_a2a_get_recipe_details_success(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "get_recipe_details",
+        "params": {"recipe_id": "1"},
+        "id": "test-detail-ok"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "result" in data
+    recipe = data["result"]["recipe"]
+    assert recipe["id"] == "1"
+    assert recipe["name"] == "Pâtes Carbonara"
+    assert "tags" in recipe
+    assert "prep_time" in recipe
+    assert "servings" in recipe
+    assert "difficulty" in recipe
+    assert "ingredients" in recipe
+    assert len(recipe["ingredients"]) > 0
+    assert "steps" in recipe
+    assert len(recipe["steps"]) > 0
+
+def test_a2a_get_recipe_details_not_found(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "get_recipe_details",
+        "params": {"recipe_id": "999"},
+        "id": "test-detail-404"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    data = response.json()
+    assert "error" in data
+    assert data["error"]["code"] == -32010 # RECIPE_NOT_FOUND
+    assert data["error"]["data"]["recipe_id"] == "999"
+
+def test_a2a_get_recipe_details_invalid_type(client):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "get_recipe_details",
+        "params": {"recipe_id": 123}, # Should fail (strict str)
+        "id": "test-detail-type"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    data = response.json()
+    assert "error" in data
+    assert data["error"]["code"] == -32602 # INVALID_PARAMS

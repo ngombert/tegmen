@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-28T22:36:30+02:00
-last_updated: 2026-05-02T20:22:00+02:00
+last_updated: 2026-05-02T21:46:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -50,9 +50,9 @@ development_status:
   epic-1-retrospective: done
 
   # Epic 2: Consultation Détaillée d'une Recette
-  epic-2: in-progress
-  2-1-extraction-complete-d-une-recette: backlog
-  2-2-fail-fast-sur-recette-inexistante: backlog
+  epic-2: done
+  2-1-extraction-complete-d-une-recette: done
+  2-2-fail-fast-sur-recette-inexistante: done
   epic-2-retrospective: optional
 
   # Epic 3: Résilience, Observabilité et Intégration Écosystème

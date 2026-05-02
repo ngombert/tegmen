@@ -45,3 +45,25 @@ class SearchResponse(BaseModel):
     
     results: list[RecipeBase]
     total_count: int
+
+class RecipeDetailRequest(BaseModel):
+    """
+    Request schema to retrieve full details of a single recipe.
+    
+    Attributes:
+        recipe_id: The unique string identifier of the recipe to retrieve.
+    """
+    model_config = ConfigDict(strict=True)
+    
+    recipe_id: str
+
+class RecipeDetailResponse(BaseModel):
+    """
+    Response schema containing the complete details of the requested recipe.
+    
+    Attributes:
+        recipe: The full RecipeDetail object containing ingredients, steps, and metadata.
+    """
+    model_config = ConfigDict(strict=True)
+    
+    recipe: RecipeDetail
