@@ -1,5 +1,5 @@
 from typing import Any
-from common.logger import setup_logger
+from agent_gourmet.app.logger import setup_gourmet_logger
 from agent_gourmet.app.services.recipe_service import RecipeService
 from agent_gourmet.app.schemas.recipe import SearchRequest, RecipeDetailRequest, RecipeDetailResponse
 
@@ -11,7 +11,7 @@ from agent_gourmet.app.context import (
     enrich_error_data,
 )
 
-logger = setup_logger("gourmet_a2a")
+logger = setup_gourmet_logger("gourmet_a2a")
 recipe_service = RecipeService()
 
 async def handle_search_recipes(params: dict[str, Any] | None) -> dict[str, Any]:
@@ -22,7 +22,7 @@ async def handle_search_recipes(params: dict[str, Any] | None) -> dict[str, Any]
     set_correlation_id(cid)
 
     cid = get_correlation_id()
-    logger.info(f"A2A | search_recipes | correlation_id={cid} | params={params}")
+    logger.info(f"A2A | search_recipes | correlation_id={cid}")
     
     try:
         # Validate and parse params
@@ -61,7 +61,7 @@ async def handle_get_recipe_details(params: dict[str, Any] | None) -> dict[str, 
     set_correlation_id(cid)
 
     cid = get_correlation_id()
-    logger.info(f"A2A | get_recipe_details | correlation_id={cid} | params={params}")
+    logger.info(f"A2A | get_recipe_details | correlation_id={cid}")
     
     try:
         # Validate and parse params
@@ -104,7 +104,7 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     set_correlation_id(cid)
 
     cid = get_correlation_id()
-    logger.info(f"A2A | message/send | correlation_id={cid} | params={params}")
+    logger.info(f"A2A | message/send | correlation_id={cid}")
     
     try:
         if not params or "message" not in params:
