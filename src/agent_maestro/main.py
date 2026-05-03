@@ -140,6 +140,31 @@ CLARIFICATION_TEMPLATE = (
 
 from common.exceptions import A2ARPCError
 
+@app.get("/dev/token/{user_id}", tags=["Development"])
+async def get_dev_token(user_id: str):
+    """
+    Utility endpoint to generate a JWT token for development and testing.
+    DO NOT USE IN PRODUCTION.
+    """
+    import jwt
+    from datetime import datetime, timedelta, timezone
+    from common.users import MOCK_PROFILES
+    
+    profile = MOCK_PROFILES.get(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable dans les mock profiles")
+        
+    payload = {
+        "user_id": profile.user_id,
+        "family_id": profile.family_id,
+        "role": profile.role,
+        "exp": datetime.now(timezone.utc) + timedelta(days=1)
+    }
+    
+    token = jwt.encode(payload, config.JWT_SECRET, algorithm=config.JWT_ALGORITHM)
+    return {"access_token": token, "token_type": "bearer"}
+
+
 @app.exception_handler(A2ARPCError)
 async def a2a_exception_handler(request: Request, exc: A2ARPCError):
     """

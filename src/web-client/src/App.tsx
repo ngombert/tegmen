@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { ChatLayout } from './components/ChatLayout';
 
@@ -11,12 +11,25 @@ interface Message {
 }
 
 function App() {
-  const [currentUser, setCurrentUser] = useState('famille');
+  const [currentUser, setCurrentUser] = useState('user-parent-1');
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Bonjour ! Je suis Tegmen, votre assistant familial. Qui êtes-vous aujourd\'hui ?' }
+    { role: 'assistant', content: 'Bonjour ! Je suis Tegmen Maestro, votre assistant familial. Sélectionnez un profil pour commencer.' }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Synchronize token on user change
+  useEffect(() => {
+    const syncToken = async () => {
+        try {
+            await api.getDevToken(currentUser);
+            console.log(`Token sync for ${currentUser} successful`);
+        } catch (error) {
+            console.error("Failed to sync dev token", error);
+        }
+    };
+    syncToken();
+  }, [currentUser]);
 
   const handleSendMessage = async (text: string) => {
     // Optimistic Update
@@ -26,23 +39,22 @@ function App() {
 
     // Real API call
     try {
-      const response = await api.sendMessage(text, currentUser, sessionId);
-
-      // Update session ID if new
-      if (response.session_id && response.session_id !== sessionId) {
-        setSessionId(response.session_id);
-      }
+      const response = await api.sendMessage(text, sessionId);
 
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: response.message,
-        data: response.route !== 'unknown' ? { agent: response.agent, route: response.route } : undefined
+        data: { 
+            agent: response.agent, 
+            route: response.route,
+            ...(response._debug || {})
+        }
       }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: "Désolé, une erreur est survenue lors de la communication avec Maestro."
+        content: `Erreur : ${error.message || "Communication avec Maestro impossible."}`
       }]);
     } finally {
       setIsLoading(false);

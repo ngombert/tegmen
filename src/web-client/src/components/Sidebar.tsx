@@ -8,10 +8,8 @@ interface UserProfile {
 }
 
 export const USERS: UserProfile[] = [
-    { id: 'papa', name: 'Papa', icon: User, color: 'bg-blue-500' },
-    { id: 'maman', name: 'Maman', icon: User, color: 'bg-pink-500' },
-    { id: 'enfants', name: 'Enfants', icon: Baby, color: 'bg-green-500' },
-    { id: 'famille', name: 'Famille', icon: Users, color: 'bg-purple-500' },
+    { id: 'user-parent-1', name: 'Jean (Parent)', icon: User, color: 'bg-blue-500' },
+    { id: 'user-child-1', name: 'Léo (Enfant)', icon: Baby, color: 'bg-green-500' },
 ];
 
 interface SidebarProps {
