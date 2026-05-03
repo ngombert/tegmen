@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class RecipeBase(BaseModel):
     """Basic recipe information for search results."""
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="ignore")
     
     id: str
     name: str
@@ -11,7 +11,7 @@ class RecipeBase(BaseModel):
 
 class Ingredient(BaseModel):
     """Structured ingredient information."""
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="ignore")
     
     name: str
     quantity: str | None = None
@@ -19,7 +19,7 @@ class Ingredient(BaseModel):
 
 class RecipeDetail(RecipeBase):
     """Full recipe details."""
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="ignore")
     
     ingredients: list[Ingredient]
     steps: list[str]
@@ -28,7 +28,7 @@ class RecipeDetail(RecipeBase):
 
 class SearchRequest(BaseModel):
     """Request schema for recipe search."""
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="ignore")
     
     query: str = ""
     tag: str | None = None # legacy, tags_include preferred
@@ -41,7 +41,7 @@ class SearchRequest(BaseModel):
 
 class SearchResponse(BaseModel):
     """Response schema for recipe search."""
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="ignore")
     
     results: list[RecipeBase]
     total_count: int
@@ -53,7 +53,7 @@ class RecipeDetailRequest(BaseModel):
     Attributes:
         recipe_id: The unique string identifier of the recipe to retrieve.
     """
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="ignore")
     
     recipe_id: str
 
@@ -64,6 +64,6 @@ class RecipeDetailResponse(BaseModel):
     Attributes:
         recipe: The full RecipeDetail object containing ingredients, steps, and metadata.
     """
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="ignore")
     
     recipe: RecipeDetail

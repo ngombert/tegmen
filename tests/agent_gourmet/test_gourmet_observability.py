@@ -8,9 +8,8 @@ import logging
 def client():
     return TestClient(app)
 
-def test_correlation_id_in_logs(client, caplog):
+def test_correlation_id_in_logs(client, capsys):
     """AC1 & AC4: Test that correlation_id is extracted and appears in logs."""
-    caplog.set_level(logging.INFO)
     
     payload = {
         "jsonrpc": "2.0",
@@ -25,9 +24,10 @@ def test_correlation_id_in_logs(client, caplog):
     response = client.post("/a2a/SendMessage", json=payload)
     assert response.status_code == 200
     
-    # Check if the correlation_id appears in the logs
-    assert "test-log-cid-123" in caplog.text
-    assert "A2A | search_recipes" in caplog.text
+    # Check if the correlation_id appears in the structured JSON logs on stdout
+    captured = capsys.readouterr()
+    assert "test-log-cid-123" in captured.out
+    assert "A2A | search_recipes" in captured.out
 
 def test_correlation_id_in_error_response(client):
     """AC2: Test that correlation_id is included in the error data."""

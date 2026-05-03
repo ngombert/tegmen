@@ -104,16 +104,24 @@ class RecipeService:
                 await asyncio.sleep(config.GOURMET_ARTIFICIAL_DELAY_MS / 1000)
             return await coro_factory()
 
+        timeout_ms = config.GOURMET_PERSISTENCE_TIMEOUT_MS
+        if timeout_ms <= 0:
+            raise A2ARPCError(
+                code=A2ARPCError.TIMEOUT,
+                message="Délai d'attente dépassé pour la persistance (configuré à 0)",
+                data={"timeout_ms": timeout_ms},
+            )
+
         try:
             return await asyncio.wait_for(
                 _delayed(),
-                timeout=config.GOURMET_PERSISTENCE_TIMEOUT_MS / 1000,
+                timeout=timeout_ms / 1000,
             )
         except asyncio.TimeoutError:
             raise A2ARPCError(
                 code=A2ARPCError.TIMEOUT,
                 message="Délai d'attente dépassé pour la persistance",
-                data={"timeout_ms": config.GOURMET_PERSISTENCE_TIMEOUT_MS},
+                data={"timeout_ms": timeout_ms},
             )
 
     async def search_recipes(self, request: SearchRequest) -> SearchResponse:

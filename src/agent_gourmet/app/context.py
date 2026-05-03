@@ -9,9 +9,13 @@ _correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar
 )
 
 
-def set_correlation_id(cid: str | None) -> None:
-    """Store correlation_id in the current async context."""
-    _correlation_id_var.set(cid)
+def set_correlation_id(cid: str | None) -> contextvars.Token[str | None]:
+    """Store correlation_id in the current async context and return a token."""
+    return _correlation_id_var.set(cid)
+
+def reset_correlation_id(token: contextvars.Token[str | None]) -> None:
+    """Reset correlation_id to its previous value using a token."""
+    _correlation_id_var.reset(token)
 
 
 def get_correlation_id() -> str | None:

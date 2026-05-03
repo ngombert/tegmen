@@ -23,9 +23,12 @@ class JSONFormatter(logging.Formatter):
         }
 
         # Inject correlation_id from context
-        cid = get_correlation_id()
-        if cid:
-            log_entry["correlation_id"] = cid
+        try:
+            cid = get_correlation_id()
+            if cid:
+                log_entry["correlation_id"] = cid
+        except Exception:
+            pass
 
         # Include exception info if present
         if record.exc_info:
