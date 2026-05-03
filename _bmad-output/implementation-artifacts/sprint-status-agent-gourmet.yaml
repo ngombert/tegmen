@@ -60,5 +60,5 @@ development_status:
   3-1-timeout-persistance-et-chaos-testing: review
   3-2-observabilite-correlation-id-et-traces: review
   3-3-structured-json-logging-et-zero-trust: review
-  3-4-documentation-readme-agent: backlog
+  3-4-documentation-readme-agent: review
   epic-3-retrospective: optional
