@@ -37,3 +37,18 @@ Transformer le Gateway Maestro d'un routeur "one-shot" vers un orchestrateur cap
 ## Critères d'Acceptation Globaux
 - Le test E2E `test_e2e_golden_path.py` doit pouvoir être étendu pour valider une conversation en 2 étapes (Question -> Réponse contextuelle).
 - Zéro impact sur les performances de Maestro (latence ajoutée < 5ms).
+
+### Review Findings
+- [x] [Review][Patch] Standardiser le format de l'agent stocké en session (évite les bugs silencieux) [src/agent_maestro/main.py]
+- [x] [Review][Patch] Valider l'interception des commandes d'évasion avec le message brut avant `sanitize_message` [src/agent_maestro/main.py]
+- [x] [Review][Patch] Empêcher le stockage de "chitchat" dans la session [src/agent_maestro/main.py]
+- [x] [Review][Patch] Extraire le seuil d'évasion (0.95) en constante [src/agent_maestro/router.py]
+- [x] [Review][Patch] DRY : Extraire la logique d'interception d'évasion dans une fonction [src/agent_maestro/main.py]
+- [x] [Review][Patch] Éviter le double appel à `get_all_scores` en mode debug [src/agent_maestro/main.py]
+- [x] [Review][Patch] Extraire le multiplicateur de bonus (1.3) en constante [src/agent_maestro/router.py]
+- [x] [Review][Patch] Enrichir la liste des mots d'évasion (synonymes et variations) [src/agent_maestro/main.py]
+- [x] [Review][Patch] Gérer et valider le cas où `session_id` est une chaîne vide [src/agent_maestro/main.py]
+- [x] [Review][Defer] Fuite mémoire potentielle (lazy deletion) — deferred, contrainte acceptée pour le MVP
+- [x] [Review][Defer] Divergence de logique dans `classify_intent` (router_inst vs get_all_scores) — deferred, optimisation voulue
+- [x] [Review][Defer] Test async/sync mélangés dans TestClient — deferred, fonctionne dans le contexte actuel
+- [x] [Review][Defer] Pas de test spécifique pour `/chat` (legacy) — deferred, endpoint déprécié

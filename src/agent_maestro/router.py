@@ -1,6 +1,7 @@
 """Semantic Router for intent classification - Dynamic Config Powered."""
 
 from typing import Optional, Dict
+from functools import lru_cache
 from semantic_router import Route
 from semantic_router.routers import SemanticRouter
 from semantic_router.encoders import HuggingFaceEncoder
@@ -72,6 +73,8 @@ def get_router() -> SemanticRouter:
 # Optimized for multilingual-e5-small (which tends to have higher similarity scores)
 THRESHOLD_ROUTING = 0.40      # Full confidence (increased from 0.30)
 THRESHOLD_CLARIFICATION = 0.20 # Ambiguous (increased from 0.15)
+THRESHOLD_ESCAPE_HATCH = 0.95  # Extremely strong intent overrides sticky routing
+STICKY_BONUS_MULTIPLIER = 1.3  # Bonus applied to active agent's score
 
 def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[str, float]:
     """
@@ -95,14 +98,14 @@ def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[s
         # Normalize active_agent to route name (e.g. agent_gourmet -> gourmet)
         active_route = active_agent[6:] if active_agent.startswith("agent_") else active_agent
         
-        # Semantic Escape Hatch: if any intention is extremely strong (> 0.95), do not apply sticky routing
-        if max(scores.values()) > 0.95:
+        # Semantic Escape Hatch: if any intention is extremely strong, do not apply sticky routing
+        if max(scores.values()) > THRESHOLD_ESCAPE_HATCH:
             best_route = max(scores.items(), key=lambda x: x[1])
             return best_route[0], float(best_route[1])
         
         # Apply bonus
         if active_route in scores:
-            scores[active_route] = min(scores[active_route] * 1.3, 1.0)
+            scores[active_route] = min(scores[active_route] * STICKY_BONUS_MULTIPLIER, 1.0)
             
         # Find the route with the highest score
         best_route = max(scores.items(), key=lambda x: x[1])
@@ -129,6 +132,13 @@ def warmup() -> None:
 def get_all_scores(message: str) -> dict[str, float]:
     """
     Get maximum similarity scores for all registered routes.
+    """
+    return _get_all_scores_cached(message).copy()
+
+@lru_cache(maxsize=128)
+def _get_all_scores_cached(message: str) -> dict[str, float]:
+    """
+    Internal cached implementation to avoid duplicate embedding calls.
     """
     if not message:
         return {}

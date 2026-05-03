@@ -4,6 +4,7 @@ import os
 import uuid
 import random
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -142,10 +143,23 @@ CLARIFICATION_TEMPLATE = (
 )
 
 # Escape commands to reset session
-ESCAPE_COMMANDS = {"stop", "annule", "annuler", "reset", "quitter", "exit", "arrete", "arrête"}
+ESCAPE_COMMANDS = {
+    "stop", "annule", "annuler", "reset", "quitter", "exit", 
+    "arrete", "arrête", "arreter", "stoppe", "fin", "terminé", 
+    "cancel", "c'est bon", "laisse tomber", "non merci"
+}
 ESCAPE_RESPONSE = "Compris, nous reprenons à zéro. Comment puis-je vous aider ?"
 
 from common.exceptions import A2ARPCError
+
+async def is_escape_command(raw_message: str, session_id: Optional[str]) -> bool:
+    if not raw_message:
+        return False
+    if raw_message.strip().lower() in ESCAPE_COMMANDS:
+        if session_id:
+            await session_store.delete(session_id)
+        return True
+    return False
 
 @app.get("/dev/token/{user_id}", tags=["Development"])
 async def get_dev_token(user_id: str):
@@ -227,15 +241,24 @@ async def route_request(
     """
     logger.info(f"📥 Received A2A routing request: method='{request.method}', user='{context.user_name}'")
     
-    # Apply PII filter if message is present in params
-    message = ""
+    raw_message = request.params.get("message", "") if request.params else ""
     session_id = None
-    if request.params:
-        if "message" in request.params:
-            message = sanitize_message(request.params["message"])
-            request.params["message"] = message
-        if "session_id" in request.params:
-            session_id = request.params["session_id"]
+    if request.params and "session_id" in request.params:
+        s_id = request.params["session_id"]
+        if s_id and isinstance(s_id, str) and s_id.strip():
+            session_id = s_id.strip()
+
+    # Escape commands check on raw message
+    if await is_escape_command(raw_message, session_id):
+        logger.info("Escape command intercepted, session reset.")
+        return JsonRpcResponse(
+            jsonrpc="2.0",
+            result={"message": ESCAPE_RESPONSE, "agent": "maestro", "route": "chitchat"},
+            id=request.id
+        )
+
+    # Apply PII filter
+    message = sanitize_message(raw_message) if raw_message else ""
         
     # Audit Trail
     log_audit_trail(
@@ -246,17 +269,6 @@ async def route_request(
     )
 
     active_agent = await session_store.get(session_id) if session_id else None
-
-    # Escape commands check
-    if message and message.strip().lower() in ESCAPE_COMMANDS:
-        if session_id:
-            await session_store.delete(session_id)
-        logger.info("Escape command intercepted, session reset.")
-        return JsonRpcResponse(
-            jsonrpc="2.0",
-            result={"message": ESCAPE_RESPONSE, "agent": "maestro", "route": "chitchat"},
-            id=request.id
-        )
 
     # Classify intent
     route, score = classify_intent(message, active_agent) if message else ("unknown", 0.0)
@@ -299,8 +311,6 @@ async def route_request(
         if route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
-            if session_id:
-                await session_store.set(session_id, "chitchat")
         elif score >= THRESHOLD_ROUTING:
             # High confidence -> Direct dispatch
             response_text = await call_remote_agent(
@@ -310,7 +320,7 @@ async def route_request(
             )
             agent_name = f"agent_{route}"
             if session_id:
-                await session_store.set(session_id, route)
+                await session_store.set(session_id, agent_name)
         elif score >= THRESHOLD_CLARIFICATION:
             # Medium confidence -> Clarification
             agent_display = route.capitalize()
@@ -381,6 +391,16 @@ async def chat(
     Effectue une classification d'intention et délègue à l'agent spécialisé.
     """
     session_id = request.session_id or str(uuid.uuid4())
+    session_id = session_id.strip() if session_id and session_id.strip() else None
+
+    if await is_escape_command(request.message, session_id):
+        logger.info("Escape command intercepted in legacy chat, session reset.")
+        return ChatResponse(
+            message=ESCAPE_RESPONSE,
+            agent="maestro",
+            session_id=session_id or "",
+            route="chitchat"
+        )
 
     # Step 0: Privacy & Audit
     sanitized_message = sanitize_message(request.message)
@@ -393,18 +413,7 @@ async def chat(
 
     # Step 1: Classify intent with semantic router
     logger.info(f"Processing message for {context.user_name}: '{sanitized_message}'")
-    active_agent = await session_store.get(session_id)
-    
-    # Escape commands check
-    if sanitized_message and sanitized_message.strip().lower() in ESCAPE_COMMANDS:
-        await session_store.delete(session_id)
-        logger.info("Escape command intercepted in legacy chat, session reset.")
-        return ChatResponse(
-            message=ESCAPE_RESPONSE,
-            agent="maestro",
-            session_id=session_id,
-            route="chitchat"
-        )
+    active_agent = await session_store.get(session_id) if session_id else None
         
     route, score = classify_intent(sanitized_message, active_agent)
     logger.info(f"Routing decision: route='{route}', score={score:.4f}")
@@ -416,7 +425,6 @@ async def chat(
         if route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
-            await session_store.set(session_id, "chitchat")
         elif score >= THRESHOLD_ROUTING:
             # Step 2: Call remote specialized agent via A2A
             response_text = await call_remote_agent(
@@ -425,7 +433,8 @@ async def chat(
                 context_id=session_id,
             )
             agent_name = f"agent_{route}"
-            await session_store.set(session_id, route)
+            if session_id:
+                await session_store.set(session_id, agent_name)
         elif score >= THRESHOLD_CLARIFICATION:
             # Clarification
             agent_display = route.capitalize()
