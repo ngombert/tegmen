@@ -74,3 +74,9 @@ development_status:
   4-4-diagnostic-trace-path: done
   4-5-optimisation-linguistique-fr: done
   epic-4-retrospective: done
+  # ── Epic 5: Gestion de Session et Routage Contextuel ────────────────────
+  epic-5: todo
+  5-1-cache-memoire-et-session-store: todo
+  5-2-sticky-routing-affinite-d-agent: todo
+  5-3-commandes-d-evasion-et-reset: todo
+  epic-5-retrospective: todo

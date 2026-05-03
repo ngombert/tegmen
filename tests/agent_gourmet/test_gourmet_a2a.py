@@ -22,7 +22,8 @@ def test_a2a_send_message_search(client):
             "message": {
                 "role": "user",
                 "parts": [{"text": "recette carbonara"}]
-            }
+            },
+            "contextId": "test-context-id"
         },
         "id": "1"
     }
@@ -30,7 +31,11 @@ def test_a2a_send_message_search(client):
     assert response.status_code == 200
     data = response.json()
     assert "result" in data
-    assert "carbonara" in data["result"]["message"].lower()
+    # Check new A2A structured response
+    assert data["result"]["role"] == "agent"
+    assert "messageId" in data["result"]
+    assert data["result"]["contextId"] == "test-context-id"
+    assert "carbonara" in data["result"]["parts"][0]["text"].lower()
 
 def test_a2a_direct_search(client):
     # Test direct JSON-RPC call to search_recipes

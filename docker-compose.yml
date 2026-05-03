@@ -89,9 +89,9 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://maestro:maestro@db:5432/maestro
       - MICROSERVICES_MODE=true
-      - GOURMET_URL=http://gourmet:8000
-      - ACADOMIE_URL=http://acadomie:8000
-      - EXPLORER_URL=http://explorer:8000
+      - AGENT_GOURMET_URL=http://gourmet:8000
+      - AGENT_ACADOMIE_URL=http://acadomie:8000
+      - AGENT_EXPLORER_URL=http://explorer:8000
     depends_on:
       db:
         condition: service_healthy

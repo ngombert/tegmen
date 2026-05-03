@@ -99,9 +99,9 @@ En mode microservices, chaque agent doit tourner sur son port respectif. Maestro
 | `DEFAULT_MODEL` | Modèle LLM utilisé par le fallback généraliste | `openrouter/google/gemini-2.0-flash-001` |
 | `EMBEDDING_MODEL` | Modèle d'embedding pour le routeur sémantique | `sentence-transformers/all-MiniLM-L6-v2` |
 | `MICROSERVICES_MODE` | Active le routage A2A vers les agents distants | `false` |
-| `GOURMET_URL` | URL de l'agent Gourmet | `http://localhost:8000` |
-| `ACADOMIE_URL` | URL de l'agent Acadomie | `http://localhost:8000` |
-| `EXPLORER_URL` | URL de l'agent Explorer | `http://localhost:8000` |
+| `AGENT_GOURMET_URL` | URL de l'agent Gourmet | `http://localhost:8001` |
+| `AGENT_ACADOMIE_URL` | URL de l'agent Acadomie | `http://localhost:8002` |
+| `AGENT_EXPLORER_URL` | URL de l'agent Explorer | `http://localhost:8003` |
 | `DEBUG` | Mode debug (logs verbeux LiteLLM) | `false` |
 
 ---

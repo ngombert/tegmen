@@ -1,11 +1,13 @@
 from typing import Any, Callable
 from functools import wraps
+import uuid
 from pydantic import ValidationError
 
 from agent_gourmet.app.logger import setup_gourmet_logger
 from agent_gourmet.app.services.recipe_service import RecipeService
 from agent_gourmet.app.schemas.recipe import SearchRequest, RecipeDetailRequest, RecipeDetailResponse
 from common.exceptions import A2ARPCError
+from common.a2a_utils import format_a2a_message
 from agent_gourmet.app.context import (
     set_correlation_id,
     reset_correlation_id,
@@ -81,6 +83,9 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
             data=enrich_error_data(None),
         )
     
+    # Propagate contextId if present
+    context_id = params.get("contextId")
+    
     message_obj = params["message"]
     text = ""
     
@@ -93,7 +98,7 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     text = text.lower().strip()
     
     if not text:
-        return {"message": "Je n'ai pas bien compris votre message. Que cherchez-vous ?"}
+        return format_a2a_message("Je n'ai pas bien compris votre message. Que cherchez-vous ?", context_id)
     
     # Simple keyword-based dispatch for Lean Gourmet
     if any(k in text for k in ["recette", "cherche", "propose", "manger"]):
@@ -104,12 +109,12 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
         response = await recipe_service.search_recipes(request)
         
         if response.total_count == 0:
-            return {"message": f"Désolé, je n'ai pas trouvé de recette pour '{query}'."}
+            return format_a2a_message(f"Désolé, je n'ai pas trouvé de recette pour '{query}'.", context_id)
         
         res_list = [r.name for r in response.results[:3]]
-        return {"message": f"Voici ce que j'ai trouvé : {', '.join(res_list)}. Laquelle vous intéresse ?"}
+        return format_a2a_message(f"Voici ce que j'ai trouvé : {', '.join(res_list)}. Laquelle vous intéresse ?", context_id)
     
-    return {"message": "Je suis l'agent Gourmet. Je peux vous aider à trouver des recettes. Que cherchez-vous ?"}
+    return format_a2a_message("Je suis l'agent Gourmet. Je peux vous aider à trouver des recettes. Que cherchez-vous ?", context_id)
 
 # Methods mapping for A2AServer registration
 GOURMET_METHODS = {
