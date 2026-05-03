@@ -73,12 +73,13 @@ def get_router() -> SemanticRouter:
 THRESHOLD_ROUTING = 0.40      # Full confidence (increased from 0.30)
 THRESHOLD_CLARIFICATION = 0.20 # Ambiguous (increased from 0.15)
 
-def classify_intent(message: str) -> tuple[str, float]:
+def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[str, float]:
     """
     Classify user intent using semantic similarity.
 
     Args:
         message: User message to classify
+        active_agent: Optional agent ID currently active in the session
 
     Returns:
         (Route name, similarity_score)
@@ -86,18 +87,37 @@ def classify_intent(message: str) -> tuple[str, float]:
     if not message:
         return ("unknown", 0.0)
         
-    router_inst = get_router()
-    # E5 optimization: queries should be prefixed with 'query: '
-    # However, it seems to cause issues with matching in this version of semantic-router.
-    # We use the raw message for now to ensure stability.
-    result = router_inst(message)
-    
-    route_name = result.name if result.name else "unknown"
-    score = getattr(result, "similarity_score", 0.0)
-    if score is None:
-        score = 0.0
-    
-    return (route_name, float(score))
+    if active_agent:
+        scores = get_all_scores(message)
+        if not scores:
+            return ("unknown", 0.0)
+            
+        # Normalize active_agent to route name (e.g. agent_gourmet -> gourmet)
+        active_route = active_agent[6:] if active_agent.startswith("agent_") else active_agent
+        
+        # Semantic Escape Hatch: if any intention is extremely strong (> 0.95), do not apply sticky routing
+        if max(scores.values()) > 0.95:
+            best_route = max(scores.items(), key=lambda x: x[1])
+            return best_route[0], float(best_route[1])
+        
+        # Apply bonus
+        if active_route in scores:
+            scores[active_route] = min(scores[active_route] * 1.3, 1.0)
+            
+        # Find the route with the highest score
+        best_route = max(scores.items(), key=lambda x: x[1])
+        return best_route[0], float(best_route[1])
+    else:
+        # Standard fast classification
+        router_inst = get_router()
+        result = router_inst(message)
+        
+        route_name = result.name if result.name else "unknown"
+        score = getattr(result, "similarity_score", 0.0)
+        if score is None:
+            score = 0.0
+        
+        return (route_name, float(score))
 
 def warmup() -> None:
     """Pre-load the embedding model and verify all routes are ready."""

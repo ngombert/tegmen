@@ -20,8 +20,11 @@ from common.users import get_user_profile
 from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError, RequestContext
 from common.logger import setup_logger
 from common.tracing import setup_tracing, instrument_app, instrument_client
+from agent_maestro.session import InMemorySessionStore
 
 logger = setup_logger("maestro")
+
+session_store = InMemorySessionStore()
 
 
 # Initialized with Lean A2A standards
@@ -138,6 +141,10 @@ CLARIFICATION_TEMPLATE = (
     "(Si oui, soyez un peu plus précis dans votre demande !)"
 )
 
+# Escape commands to reset session
+ESCAPE_COMMANDS = {"stop", "annule", "annuler", "reset", "quitter", "exit", "arrete", "arrête"}
+ESCAPE_RESPONSE = "Compris, nous reprenons à zéro. Comment puis-je vous aider ?"
+
 from common.exceptions import A2ARPCError
 
 @app.get("/dev/token/{user_id}", tags=["Development"])
@@ -222,9 +229,13 @@ async def route_request(
     
     # Apply PII filter if message is present in params
     message = ""
-    if request.params and "message" in request.params:
-        message = sanitize_message(request.params["message"])
-        request.params["message"] = message
+    session_id = None
+    if request.params:
+        if "message" in request.params:
+            message = sanitize_message(request.params["message"])
+            request.params["message"] = message
+        if "session_id" in request.params:
+            session_id = request.params["session_id"]
         
     # Audit Trail
     log_audit_trail(
@@ -234,8 +245,21 @@ async def route_request(
         extra={"method": request.method, "rpc_id": str(request.id), "role": context.role}
     )
 
+    active_agent = await session_store.get(session_id) if session_id else None
+
+    # Escape commands check
+    if message and message.strip().lower() in ESCAPE_COMMANDS:
+        if session_id:
+            await session_store.delete(session_id)
+        logger.info("Escape command intercepted, session reset.")
+        return JsonRpcResponse(
+            jsonrpc="2.0",
+            result={"message": ESCAPE_RESPONSE, "agent": "maestro", "route": "chitchat"},
+            id=request.id
+        )
+
     # Classify intent
-    route, score = classify_intent(message) if message else ("unknown", 0.0)
+    route, score = classify_intent(message, active_agent) if message else ("unknown", 0.0)
     logger.info(f"🎯 Intent classified: route='{route}', score={score:.4f}")
 
     # RBAC Check
@@ -275,14 +299,18 @@ async def route_request(
         if route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
+            if session_id:
+                await session_store.set(session_id, "chitchat")
         elif score >= THRESHOLD_ROUTING:
             # High confidence -> Direct dispatch
             response_text = await call_remote_agent(
                 route=route,
                 message=message,
-                context_id=str(request.id),
+                context_id=session_id or str(request.id),
             )
             agent_name = f"agent_{route}"
+            if session_id:
+                await session_store.set(session_id, route)
         elif score >= THRESHOLD_CLARIFICATION:
             # Medium confidence -> Clarification
             agent_display = route.capitalize()
@@ -365,7 +393,20 @@ async def chat(
 
     # Step 1: Classify intent with semantic router
     logger.info(f"Processing message for {context.user_name}: '{sanitized_message}'")
-    route, score = classify_intent(sanitized_message)
+    active_agent = await session_store.get(session_id)
+    
+    # Escape commands check
+    if sanitized_message and sanitized_message.strip().lower() in ESCAPE_COMMANDS:
+        await session_store.delete(session_id)
+        logger.info("Escape command intercepted in legacy chat, session reset.")
+        return ChatResponse(
+            message=ESCAPE_RESPONSE,
+            agent="maestro",
+            session_id=session_id,
+            route="chitchat"
+        )
+        
+    route, score = classify_intent(sanitized_message, active_agent)
     logger.info(f"Routing decision: route='{route}', score={score:.4f}")
     
     # Step 1.5: RBAC Check
@@ -375,6 +416,7 @@ async def chat(
         if route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
+            await session_store.set(session_id, "chitchat")
         elif score >= THRESHOLD_ROUTING:
             # Step 2: Call remote specialized agent via A2A
             response_text = await call_remote_agent(
@@ -383,6 +425,7 @@ async def chat(
                 context_id=session_id,
             )
             agent_name = f"agent_{route}"
+            await session_store.set(session_id, route)
         elif score >= THRESHOLD_CLARIFICATION:
             # Clarification
             agent_display = route.capitalize()
