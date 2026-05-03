@@ -12,7 +12,7 @@ interface Message {
 
 function App() {
   const [currentUser, setCurrentUser] = useState('user-parent-1');
-  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const [sessionId] = useState<string | undefined>(undefined);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Bonjour ! Je suis Tegmen Maestro, votre assistant familial. Sélectionnez un profil pour commencer.' }
   ]);
@@ -21,12 +21,12 @@ function App() {
   // Synchronize token on user change
   useEffect(() => {
     const syncToken = async () => {
-        try {
-            await api.getDevToken(currentUser);
-            console.log(`Token sync for ${currentUser} successful`);
-        } catch (error) {
-            console.error("Failed to sync dev token", error);
-        }
+      try {
+        await api.getDevToken(currentUser);
+        console.log(`Token sync for ${currentUser} successful`);
+      } catch (error) {
+        console.error("Failed to sync dev token", error);
+      }
     };
     syncToken();
   }, [currentUser]);
@@ -44,10 +44,10 @@ function App() {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: response.message,
-        data: { 
-            agent: response.agent, 
-            route: response.route,
-            ...(response._debug || {})
+        data: {
+          agent: response.agent,
+          route: response.route,
+          ...(response._debug || {})
         }
       }]);
     } catch (error: any) {

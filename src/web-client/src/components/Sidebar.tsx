@@ -1,4 +1,4 @@
-import { type LucideIcon, User, Users, Baby } from 'lucide-react';
+import { type LucideIcon, User, Baby } from 'lucide-react';
 
 interface UserProfile {
     id: string;
