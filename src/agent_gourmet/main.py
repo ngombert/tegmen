@@ -58,10 +58,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Mount A2A app at root - handles /a2a/SendMessage, /a2a/AgentCard, etc.
-app.mount("/", a2a_app)
 
 @app.get("/health", tags=["System"])
 async def health():
     """Endpoint de santé pour monitoring."""
     return {"status": "ok", "agent": "gourmet", "mode": "lean"}
+
+
+# Mount A2A app at root - handles /a2a/SendMessage, /a2a/AgentCard, etc.
+# NOTE: Must be mounted AFTER explicit routes (e.g., /health) because a
+# root mount intercepts all paths not previously registered.
+app.mount("/", a2a_app)

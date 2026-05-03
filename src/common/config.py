@@ -42,6 +42,10 @@ class Settings:
     MAESTRO_URL: str = os.getenv("MAESTRO_URL", "http://localhost:8000")
     DEFAULT_A2A_TIMEOUT: float = float(os.getenv("DEFAULT_A2A_TIMEOUT", "5.0"))
 
+    # Gourmet Resilience Configuration
+    GOURMET_PERSISTENCE_TIMEOUT_MS: int = int(os.getenv("GOURMET_PERSISTENCE_TIMEOUT_MS", "3000"))
+    GOURMET_ARTIFICIAL_DELAY_MS: int = int(os.getenv("GOURMET_ARTIFICIAL_DELAY_MS", "0"))
+
 
 @lru_cache
 def get_settings() -> Settings:

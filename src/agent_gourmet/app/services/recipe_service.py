@@ -1,3 +1,5 @@
+import asyncio
+from common.config import config
 from common.exceptions import A2ARPCError
 from agent_gourmet.app.schemas.recipe import (
     RecipeBase,
@@ -79,27 +81,63 @@ RECIPES_DB: list[RecipeDetail] = [
     ),
 ]
 
+
 class RecipeService:
     """Service handling recipe business logic."""
+
+    async def _with_timeout(self, coro_factory):
+        """
+        Apply chaos delay + asyncio timeout to any persistence operation.
+
+        Accepts a *callable* (coro_factory) rather than a pre-built coroutine so that the
+        coroutine object is only created inside _delayed, guaranteeing it is always awaited
+        (or never created when the sleep itself times out first).
+
+        Injects GOURMET_ARTIFICIAL_DELAY_MS before the operation (chaos testing),
+        then enforces GOURMET_PERSISTENCE_TIMEOUT_MS as a hard cutoff via asyncio.wait_for.
+
+        Raises:
+            A2ARPCError: TIMEOUT (-32000) if the operation exceeds the configured threshold.
+        """
+        async def _delayed():
+            if config.GOURMET_ARTIFICIAL_DELAY_MS > 0:
+                await asyncio.sleep(config.GOURMET_ARTIFICIAL_DELAY_MS / 1000)
+            return await coro_factory()
+
+        try:
+            return await asyncio.wait_for(
+                _delayed(),
+                timeout=config.GOURMET_PERSISTENCE_TIMEOUT_MS / 1000,
+            )
+        except asyncio.TimeoutError:
+            raise A2ARPCError(
+                code=A2ARPCError.TIMEOUT,
+                message="Délai d'attente dépassé pour la persistance",
+                data={"timeout_ms": config.GOURMET_PERSISTENCE_TIMEOUT_MS},
+            )
 
     async def search_recipes(self, request: SearchRequest) -> SearchResponse:
         """
         Search for recipes based on multiple filters and pagination.
-        
+
         Args:
             request: Search parameters and filters
-            
+
         Returns:
             Paginated search results matching all criteria
         """
+        return await self._with_timeout(lambda: self._do_search_recipes(request))
+
+    async def _do_search_recipes(self, request: SearchRequest) -> SearchResponse:
+        """Internal search implementation (wrapped by _with_timeout)."""
         matches: list[RecipeBase] = []
         query = request.query.lower().strip()
-        
+
         # Normalize filter inputs
         tags_inc = [t.lower() for t in request.tags_include] if request.tags_include else []
-        if request.tag: # Backward compatibility
+        if request.tag:  # Backward compatibility
             tags_inc.append(request.tag.lower())
-            
+
         tags_exc = [t.lower() for t in request.tags_exclude] if request.tags_exclude else []
         ing_exc = [i.lower() for i in request.ingredients_exclude] if request.ingredients_exclude else []
 
@@ -107,19 +145,19 @@ class RecipeService:
             # 1. Filter by prep time
             if request.max_prep_time and recipe.prep_time > request.max_prep_time:
                 continue
-                
+
             # 2. Filter by tags_include (ALL must be present)
             if tags_inc:
                 recipe_tags = [t.lower() for t in recipe.tags]
                 if not all(t in recipe_tags for t in tags_inc):
                     continue
-            
+
             # 3. Filter by tags_exclude (NONE must be present)
             if tags_exc:
                 recipe_tags = [t.lower() for t in recipe.tags]
                 if any(t in recipe_tags for t in tags_exc):
                     continue
-            
+
             # 4. Filter by ingredients_exclude
             if ing_exc:
                 recipe_ing_names = [i.name.lower() for i in recipe.ingredients]
@@ -130,7 +168,7 @@ class RecipeService:
                         break
                 if excluded_found:
                     continue
-            
+
             # 5. Filter by query (matches name OR any ingredient)
             if query:
                 match_found = query in recipe.name.lower()
@@ -141,36 +179,41 @@ class RecipeService:
                             break
                 if not match_found:
                     continue
-            
+
             # If we reached here, the recipe matches all criteria
             matches.append(RecipeBase(**recipe.model_dump()))
 
         total_count = len(matches)
-        
+
         # Apply pagination
         results = matches[request.offset : request.offset + request.limit]
-        
+
         return SearchResponse(results=results, total_count=total_count)
 
     async def get_recipe_details(self, recipe_id: str) -> RecipeDetail:
         """
         Retrieve full details for a specific recipe.
-        
+
         Args:
             recipe_id: Unique identifier of the recipe
-            
+
         Returns:
             Complete recipe details
-            
+
         Raises:
-            A2ARPCError: If recipe is not found
+            A2ARPCError: RECIPE_NOT_FOUND if recipe does not exist
+            A2ARPCError: TIMEOUT if persistence exceeds configured threshold
         """
+        return await self._with_timeout(lambda: self._do_get_recipe_details(recipe_id))
+
+    async def _do_get_recipe_details(self, recipe_id: str) -> RecipeDetail:
+        """Internal detail retrieval implementation (wrapped by _with_timeout)."""
         for recipe in RECIPES_DB:
             if recipe.id == recipe_id:
                 return recipe
-        
+
         raise A2ARPCError(
             code=A2ARPCError.RECIPE_NOT_FOUND,
             message="Recette non trouvée",
-            data={"recipe_id": recipe_id}
+            data={"recipe_id": recipe_id},
         )

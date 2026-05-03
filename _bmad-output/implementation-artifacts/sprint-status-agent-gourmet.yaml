@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-28T22:36:30+02:00
-last_updated: 2026-05-02T21:46:00+02:00
+last_updated: 2026-05-03T16:34:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -56,9 +56,9 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Résilience, Observabilité et Intégration Écosystème
-  epic-3: backlog
-  3-1-timeout-persistance-et-chaos-testing: backlog
-  3-2-observabilite-correlation-id-et-traces: backlog
+  epic-3: in-progress
+  3-1-timeout-persistance-et-chaos-testing: review
+  3-2-observabilite-correlation-id-et-traces: ready-for-dev
   3-3-structured-json-logging-et-zero-trust: backlog
   3-4-documentation-readme-agent: backlog
   epic-3-retrospective: optional
