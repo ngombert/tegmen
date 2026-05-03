@@ -32,6 +32,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Si tu modifies ton code, seule cette étape est refaite (très rapide)
 COPY src/common ./common
 COPY src/agent_maestro ./agent_maestro
+COPY config ./config
 
 # Configuration
 ENV PYTHONPATH=/app

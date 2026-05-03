@@ -56,9 +56,9 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Résilience, Observabilité et Intégration Écosystème
-  epic-3: in-progress
-  3-1-timeout-persistance-et-chaos-testing: review
-  3-2-observabilite-correlation-id-et-traces: review
-  3-3-structured-json-logging-et-zero-trust: review
-  3-4-documentation-readme-agent: review
-  epic-3-retrospective: optional
+  epic-3: done
+  3-1-timeout-persistance-et-chaos-testing: done
+  3-2-observabilite-correlation-id-et-traces: done
+  3-3-structured-json-logging-et-zero-trust: done
+  3-4-documentation-readme-agent: done
+  epic-3-retrospective: done

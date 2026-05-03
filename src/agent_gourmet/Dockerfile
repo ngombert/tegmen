@@ -30,8 +30,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # 5. On copie le code source APRÈS les dépendances
 # Si tu modifies ton code, seule cette étape est refaite (très rapide)
-COPY src/common ./src/common
-COPY src/agent_gourmet ./src/agent_gourmet
+COPY src/common ./common
+COPY src/agent_gourmet ./agent_gourmet
 
 # Configuration
 ENV PYTHONPATH=/app
