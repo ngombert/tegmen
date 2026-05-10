@@ -19,9 +19,11 @@ def test_classify_chitchat():
     assert score > 0.5
 
 def test_classify_unknown():
+    # With the unified pipeline, classify_intent always returns the best route
+    # from get_all_scores. For unrecognizable text, the score will be very low.
+    # The "unknown" fallback is handled by main.py's threshold dispatch.
     route, score = classify_intent("XJKYZZZ random text")
-    assert route == "unknown"
-    assert score < 0.2
+    assert score < 0.2  # Below any routing threshold
 
 @patch("agent_maestro.router.agent_registry")
 def test_dynamic_reloal_and_routing(mock_registry):

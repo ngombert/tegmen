@@ -1,7 +1,6 @@
 """Semantic Router for intent classification - Dynamic Config Powered."""
 
 from typing import Optional, Dict
-from functools import lru_cache
 from semantic_router import Route
 from semantic_router.routers import SemanticRouter
 from semantic_router.encoders import HuggingFaceEncoder
@@ -80,6 +79,9 @@ def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[s
     """
     Classify user intent using semantic similarity.
 
+    Uses get_all_scores for ALL paths (with or without active_agent)
+    to guarantee numerically comparable scores.
+
     Args:
         message: User message to classify
         active_agent: Optional agent ID currently active in the session
@@ -89,38 +91,27 @@ def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[s
     """
     if not message:
         return ("unknown", 0.0)
-        
+
+    scores = get_all_scores(message).copy()
+    if not scores:
+        return ("unknown", 0.0)
+
     if active_agent:
-        scores = get_all_scores(message)
-        if not scores:
-            return ("unknown", 0.0)
-            
         # Normalize active_agent to route name (e.g. agent_gourmet -> gourmet)
         active_route = active_agent[6:] if active_agent.startswith("agent_") else active_agent
-        
+
         # Semantic Escape Hatch: if any intention is extremely strong, do not apply sticky routing
         if max(scores.values()) > THRESHOLD_ESCAPE_HATCH:
             best_route = max(scores.items(), key=lambda x: x[1])
             return best_route[0], float(best_route[1])
-        
+
         # Apply bonus
         if active_route in scores:
             scores[active_route] = min(scores[active_route] * STICKY_BONUS_MULTIPLIER, 1.0)
-            
-        # Find the route with the highest score
-        best_route = max(scores.items(), key=lambda x: x[1])
-        return best_route[0], float(best_route[1])
-    else:
-        # Standard fast classification
-        router_inst = get_router()
-        result = router_inst(message)
-        
-        route_name = result.name if result.name else "unknown"
-        score = getattr(result, "similarity_score", 0.0)
-        if score is None:
-            score = 0.0
-        
-        return (route_name, float(score))
+
+    # Find the route with the highest score
+    best_route = max(scores.items(), key=lambda x: x[1])
+    return best_route[0], float(best_route[1])
 
 def warmup() -> None:
     """Pre-load the embedding model and verify all routes are ready."""
@@ -132,38 +123,35 @@ def warmup() -> None:
 def get_all_scores(message: str) -> dict[str, float]:
     """
     Get maximum similarity scores for all registered routes.
-    """
-    return _get_all_scores_cached(message).copy()
 
-@lru_cache(maxsize=128)
-def _get_all_scores_cached(message: str) -> dict[str, float]:
-    """
-    Internal cached implementation to avoid duplicate embedding calls.
+    Encodes the message and queries the index directly.
+    No caching — conversational messages are typically unique,
+    making an unbounded lru_cache a memory leak.
     """
     if not message:
         return {}
-        
+
     router_inst = get_router()
-    # Use direct encoding without prefix for now
+    # Encode message into embedding vector
     v = router_inst.encoder([message])
     # Convert to numpy array for compatibility with index.query
     vector = np.array(v[0])
     # Query index (get enough results to cover all routes)
     scores, routes = router_inst.index.query(vector, top_k=100)
-    
-    route_scores = {}
+
+    route_scores: dict[str, float] = {}
     for r, s in zip(routes, scores):
         route_name = str(r)
         score = float(s)
         # Keep the best score for each route
         if route_name not in route_scores or score > route_scores[route_name]:
             route_scores[route_name] = score
-            
+
     # Add routes that might have 0 score if not in top_k
     for route in router_inst.routes:
         if route.name not in route_scores:
             route_scores[route.name] = 0.0
-            
+
     return route_scores
 
 def reload_router() -> None:

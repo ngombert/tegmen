@@ -3,21 +3,21 @@ from unittest.mock import patch, MagicMock
 
 from agent_maestro.router import classify_intent, THRESHOLD_CLARIFICATION, THRESHOLD_ROUTING
 
-@patch("agent_maestro.router.get_router")
-def test_classify_intent_without_active_agent(mock_get_router):
-    mock_router = MagicMock()
-    mock_result = MagicMock()
-    mock_result.name = "gourmet"
-    mock_result.similarity_score = 0.45
-    mock_router.return_value = mock_result
-    mock_get_router.return_value = mock_router
+
+@patch("agent_maestro.router.get_all_scores")
+def test_classify_intent_without_active_agent(mock_get_all_scores):
+    """Without active_agent, classify_intent uses get_all_scores (unified path)."""
+    mock_get_all_scores.return_value = {
+        "gourmet": 0.45,
+        "acadomie": 0.10,
+        "chitchat": 0.25
+    }
     
-    # Use a message that is somewhat ambiguous or scores generally
     route, score = classify_intent("Je veux préparer à manger")
-    # It should classify as gourmet normally
+    
     assert route == "gourmet"
-    # The score should be greater than 0
     assert score == 0.45
+    mock_get_all_scores.assert_called_once_with("Je veux préparer à manger")
 
 @patch("agent_maestro.router.get_all_scores")
 def test_classify_intent_with_active_agent_bonus(mock_get_all_scores):
@@ -28,11 +28,7 @@ def test_classify_intent_with_active_agent_bonus(mock_get_all_scores):
         "chitchat": 0.25
     }
     
-    # 1. Without active agent, the best route should be 'gourmet', but with its original score 0.35
-    # Since we mocked get_all_scores but the original implementation of classify_intent 
-    # only calls get_all_scores when active_agent is provided, we must test the active_agent branch.
-    
-    # 2. With active agent 'gourmet', it gets a * 1.3 bonus.
+    # With active agent 'gourmet', it gets a * 1.3 bonus.
     # 0.35 * 1.3 = 0.455. It should become the top score and cross the routing threshold.
     route, score = classify_intent("message bidon", active_agent="gourmet")
     
@@ -81,3 +77,69 @@ def test_classify_intent_semantic_escape_hatch(mock_get_all_scores):
     
     assert route == "acadomie"
     assert score == 0.96
+
+
+@patch("agent_maestro.router.get_all_scores")
+def test_classify_intent_unified_path_same_source(mock_get_all_scores):
+    """Both with and without active_agent use the same get_all_scores source."""
+    mock_get_all_scores.return_value = {
+        "gourmet": 0.50,
+        "acadomie": 0.30,
+        "chitchat": 0.10,
+    }
+    
+    # Without active agent
+    route1, score1 = classify_intent("test message")
+    # With active agent that doesn't change the winner
+    route2, score2 = classify_intent("test message", active_agent="agent_chitchat")
+    
+    # Both should use the same underlying scores
+    assert route1 == "gourmet"
+    assert score1 == 0.50
+    # gourmet still wins (chitchat 0.10 * 1.3 = 0.13 < 0.50)
+    assert route2 == "gourmet"
+    assert score2 == 0.50
+    # get_all_scores was called for both paths
+    assert mock_get_all_scores.call_count == 2
+
+
+@patch("agent_maestro.router.get_all_scores")
+def test_classify_intent_empty_scores(mock_get_all_scores):
+    """When get_all_scores returns an empty dict, classify_intent returns unknown."""
+    mock_get_all_scores.return_value = {}
+    
+    route, score = classify_intent("some message")
+    
+    assert route == "unknown"
+    assert score == 0.0
+
+
+@patch("agent_maestro.router.get_all_scores")
+def test_classify_intent_empty_scores_with_active_agent(mock_get_all_scores):
+    """Empty scores with active_agent should also return unknown."""
+    mock_get_all_scores.return_value = {}
+    
+    route, score = classify_intent("some message", active_agent="agent_gourmet")
+    
+    assert route == "unknown"
+    assert score == 0.0
+
+
+def test_classify_intent_empty_message():
+    """Empty message should return unknown without calling get_all_scores."""
+    route, score = classify_intent("")
+    
+    assert route == "unknown"
+    assert score == 0.0
+
+
+def test_classify_intent_none_active_agent_equivalent():
+    """Passing None as active_agent should behave the same as not passing it."""
+    with patch("agent_maestro.router.get_all_scores") as mock:
+        mock.return_value = {"gourmet": 0.60, "chitchat": 0.20}
+        
+        route1, score1 = classify_intent("test")
+        route2, score2 = classify_intent("test", active_agent=None)
+        
+        assert (route1, score1) == (route2, score2)
+        assert route1 == "gourmet"
