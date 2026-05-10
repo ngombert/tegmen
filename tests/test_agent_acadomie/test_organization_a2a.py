@@ -124,3 +124,29 @@ async def test_organization_advice_timeout(mock_acompletion, client):
     assert "error" in data
     assert data["error"]["code"] == -32000 # TIMEOUT
     assert "surchargé" in data["error"]["message"]
+
+@pytest.mark.asyncio
+async def test_organization_advice_out_of_domain(client, mock_litellm):
+    """Test advice generation prompt includes out-of-domain constraints."""
+    rpc_request = {
+        "jsonrpc": "2.0",
+        "method": "organization/advice",
+        "params": {
+            "student_id": "student-1",
+            "question": "Donne moi la recette de la tarte aux pommes.",
+            "context": {
+                "family_id": "fam-123"
+            }
+        },
+        "id": "5"
+    }
+    
+    response = await client.post("/a2a/SendMessage", json=rpc_request)
+    assert response.status_code == 200
+    
+    # Verify the constraints are in the system prompt
+    kwargs = mock_litellm.call_args.kwargs
+    system_prompt = kwargs["messages"][0]["content"]
+    assert "CHARTE ANTI-HALLUCINATION" in system_prompt
+    assert "refuser poliment de répondre" in system_prompt
+    assert "sort de ton domaine d'expertise" in system_prompt
