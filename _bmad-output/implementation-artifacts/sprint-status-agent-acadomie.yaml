@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-10T20:11:18+02:00
-last_updated: 2026-05-10T23:03:00+02:00
+last_updated: 2026-05-10T23:11:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -56,8 +56,8 @@ development_status:
   epic-2-retrospective: optional
 
   # === ACA-Epic-3: Intégration Écosystème et Résilience ===
-  epic-3: in-progress
+  epic-3: done
   3-1-observabilite-et-tracabilite-logging-structure-et-correlation-id: done
   3-2-charte-anti-hallucination-et-gestion-des-erreurs-a2a: done
-  3-3-tests-de-resilience-et-chaos-testing: backlog
+  3-3-tests-de-resilience-et-chaos-testing: done
   epic-3-retrospective: optional
