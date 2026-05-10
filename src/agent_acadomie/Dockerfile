@@ -34,8 +34,8 @@ COPY src/common ./src/common
 COPY src/agent_acadomie ./src/agent_acadomie
 
 # Configuration
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/src
 EXPOSE 8000
 
 # Lancement direct (plus rapide, moins de mémoire)
-CMD ["uvicorn", "src.agent_acadomie.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "agent_acadomie.main:app", "--host", "0.0.0.0", "--port", "8000"]

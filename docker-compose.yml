@@ -52,15 +52,12 @@ services:
     profiles: ["acadomie", "all", "agents"]
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - DATABASE_URL=postgresql+asyncpg://acadomie:acadomie@db:5432/acadomie
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
       - "8002:8000"
     volumes:
       - ./src:/app/src
-    command: uvicorn src.agent_acadomie.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./config:/app/config
+    command: uvicorn agent_acadomie.main:app --host 0.0.0.0 --port 8000 --reload
 
   explorer:
     build:

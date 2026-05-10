@@ -1,0 +1,63 @@
+# generated: 2026-05-10T20:11:18+02:00
+# last_updated: 2026-05-10T20:11:18+02:00
+# project: tegmen
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-05-10T20:11:18+02:00
+last_updated: 2026-05-10T20:25:03+02:00
+project: tegmen
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # === ACA-Epic-1: Socle Asynchrone et Contrats A2A (Gestion Quotidienne MVP) ===
+  epic-1: in-progress
+  1-1-fondation-de-l-agent-et-starter-template-a2a: done
+  1-2-consultation-et-ajout-de-devoirs-mock-en-memoire: backlog
+  1-3-consultation-du-calendrier-scolaire-mock-en-memoire: backlog
+  epic-1-retrospective: optional
+
+  # === ACA-Epic-2: Suivi Académique et Logique LLM (Notes et Organisation) ===
+  epic-2: backlog
+  2-1-consultation-des-notes-par-matiere-avec-controle-d-acces: backlog
+  2-2-generation-de-conseils-d-organisation-via-inference-llm: backlog
+  epic-2-retrospective: optional
+
+  # === ACA-Epic-3: Intégration Écosystème et Résilience ===
+  epic-3: backlog
+  3-1-observabilite-et-tracabilite-logging-structure-et-correlation-id: backlog
+  3-2-charte-anti-hallucination-et-gestion-des-erreurs-a2a: backlog
+  3-3-tests-de-resilience-et-chaos-testing: backlog
+  epic-3-retrospective: optional
