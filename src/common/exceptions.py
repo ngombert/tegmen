@@ -13,6 +13,7 @@ class A2ARPCError(Exception):
     # A2A specific error codes (SLA and availability)
     TIMEOUT = -32000
     AGENT_UNAVAILABLE = -32001
+    FORBIDDEN = -32002
 
     # Domain-specific error codes (Agent Gourmet)
     RECIPE_NOT_FOUND = -32010

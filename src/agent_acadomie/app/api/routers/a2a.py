@@ -14,10 +14,13 @@ from agent_acadomie.app.schemas.homework import HomeworkListRequest, HomeworkLis
 from agent_acadomie.app.services.homework_service import HomeworkService
 from agent_acadomie.app.schemas.calendar import CalendarRequest, CalendarResponse
 from agent_acadomie.app.services.calendar_service import CalendarService
+from agent_acadomie.app.schemas.grades import GradeRequest, GradeResponse, UserIdentity
+from agent_acadomie.app.services.grades_service import GradesService
 
 logger = setup_acadomie_logger("acadomie_a2a")
 homework_service = HomeworkService()
 calendar_service = CalendarService()
+grades_service = GradesService()
 
 def with_context(func: Callable) -> Callable:
     @wraps(func)
@@ -150,10 +153,61 @@ async def handle_calendar_list(params: dict[str, Any] | None) -> dict[str, Any]:
     response = CalendarResponse(events=events, total_count=len(events))
     return response.model_dump()
 
+@with_context
+async def handle_grades_list(params: dict[str, Any] | None) -> dict[str, Any]:
+    """
+    Handler for grades/list JSON-RPC method.
+    Retrieves the grades for a specific student, applying role-based access control.
+    """
+    request_data = params or {}
+    
+    # Extract context
+    ctx = request_data.get("context", {})
+    if not isinstance(ctx, dict):
+        ctx = {}
+        
+    # Extract family_id
+    if "family_id" not in request_data and "family_id" in ctx:
+        request_data["family_id"] = ctx["family_id"]
+        
+    # Validation of the basic request
+    request = GradeRequest(**request_data)
+    
+    # Extract and validate user identity
+    user_data = ctx.get("user") or ctx.get("user_identity")
+    if not user_data:
+        raise A2ARPCError(
+            code=A2ARPCError.FORBIDDEN,
+            message="Accès refusé : Identité de l'utilisateur non fournie dans le contexte",
+            data=enrich_error_data(None),
+        )
+        
+    user = UserIdentity(**user_data)
+    
+    # RBAC logic
+    if user.role != "parent" and user.id != request.student_id:
+        raise A2ARPCError(
+            code=A2ARPCError.FORBIDDEN,
+            message="Accès refusé : Vous n'avez pas l'autorisation de consulter les notes de cet élève",
+            data=enrich_error_data(None),
+        )
+        
+    grades = await grades_service.get_grades(request.family_id, request.student_id)
+    
+    avg = None
+    if grades:
+        # Simple average out of 20
+        normalized_grades = [(g.grade / g.max_grade) * 20 for g in grades]
+        avg = sum(normalized_grades) / len(normalized_grades)
+        
+    response = GradeResponse(grades=grades, average=avg)
+    return response.model_dump()
+
 # Methods mapping for A2AServer registration
 ACADOMIE_METHODS = {
     "message/send": handle_message_send,
     "homework/list": handle_homework_list,
     "homework/add": handle_homework_add,
     "calendar/list": handle_calendar_list,
+    "grades/list": handle_grades_list,
 }
