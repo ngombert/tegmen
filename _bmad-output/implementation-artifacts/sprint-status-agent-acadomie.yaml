@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-10T20:11:18+02:00
-last_updated: 2026-05-10T22:38:00+02:00
+last_updated: 2026-05-10T22:50:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -50,9 +50,9 @@ development_status:
   epic-1-retrospective: optional
 
   # === ACA-Epic-2: Suivi Académique et Logique LLM (Notes et Organisation) ===
-  epic-2: in-progress
+  epic-2: done
   2-1-consultation-des-notes-par-matiere-avec-controle-d-acces: done
-  2-2-generation-de-conseils-d-organisation-via-inference-llm: backlog
+  2-2-generation-de-conseils-d-organisation-via-inference-llm: done
   epic-2-retrospective: optional
 
   # === ACA-Epic-3: Intégration Écosystème et Résilience ===
