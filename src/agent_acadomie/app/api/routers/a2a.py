@@ -12,9 +12,12 @@ from agent_acadomie.app.context import (
 )
 from agent_acadomie.app.schemas.homework import HomeworkListRequest, HomeworkListResponse, HomeworkAddRequest
 from agent_acadomie.app.services.homework_service import HomeworkService
+from agent_acadomie.app.schemas.calendar import CalendarRequest, CalendarResponse
+from agent_acadomie.app.services.calendar_service import CalendarService
 
 logger = setup_acadomie_logger("acadomie_a2a")
 homework_service = HomeworkService()
+calendar_service = CalendarService()
 
 def with_context(func: Callable) -> Callable:
     @wraps(func)
@@ -127,9 +130,30 @@ async def handle_homework_add(params: dict[str, Any] | None) -> dict[str, Any]:
     new_hw = await homework_service.add_homework(request)
     return new_hw.model_dump()
 
+@with_context
+async def handle_calendar_list(params: dict[str, Any] | None) -> dict[str, Any]:
+    """
+    Handler for calendar/list JSON-RPC method.
+    Retrieves the school calendar events for the family.
+    Useful for checking upcoming exams, school trips, and meetings.
+    """
+    request_data = params or {}
+    
+    # Extract family_id from context if not in params
+    if "family_id" not in request_data and "context" in request_data:
+        ctx = request_data["context"]
+        if isinstance(ctx, dict) and "family_id" in ctx:
+            request_data["family_id"] = ctx["family_id"]
+            
+    request = CalendarRequest(**request_data)
+    events = await calendar_service.get_events(request.family_id)
+    response = CalendarResponse(events=events, total_count=len(events))
+    return response.model_dump()
+
 # Methods mapping for A2AServer registration
 ACADOMIE_METHODS = {
     "message/send": handle_message_send,
     "homework/list": handle_homework_list,
     "homework/add": handle_homework_add,
+    "calendar/list": handle_calendar_list,
 }
