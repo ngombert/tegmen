@@ -10,8 +10,11 @@ from agent_acadomie.app.context import (
     reset_correlation_id,
     enrich_error_data,
 )
+from agent_acadomie.app.schemas.homework import HomeworkListRequest, HomeworkListResponse, HomeworkAddRequest
+from agent_acadomie.app.services.homework_service import HomeworkService
 
 logger = setup_acadomie_logger("acadomie_a2a")
+homework_service = HomeworkService()
 
 def with_context(func: Callable) -> Callable:
     @wraps(func)
@@ -93,7 +96,40 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     
     return format_a2a_message("Je suis l'agent Acadomie. Je peux vous aider pour les devoirs, le calendrier et les notes. Que voulez-vous faire ?", context_id)
 
+@with_context
+async def handle_homework_list(params: dict[str, Any] | None) -> dict[str, Any]:
+    """Handler for homework/list JSON-RPC method."""
+    request_data = params or {}
+    
+    # Extract family_id from context if not in params
+    if "family_id" not in request_data and "context" in request_data:
+        ctx = request_data["context"]
+        if isinstance(ctx, dict) and "family_id" in ctx:
+            request_data["family_id"] = ctx["family_id"]
+            
+    request = HomeworkListRequest(**request_data)
+    homeworks = await homework_service.get_homework(request.family_id, request.include_completed)
+    response = HomeworkListResponse(homeworks=homeworks, total_count=len(homeworks))
+    return response.model_dump()
+
+@with_context
+async def handle_homework_add(params: dict[str, Any] | None) -> dict[str, Any]:
+    """Handler for homework/add JSON-RPC method."""
+    request_data = params or {}
+    
+    # Extract family_id from context if not in params
+    if "family_id" not in request_data and "context" in request_data:
+        ctx = request_data["context"]
+        if isinstance(ctx, dict) and "family_id" in ctx:
+            request_data["family_id"] = ctx["family_id"]
+            
+    request = HomeworkAddRequest(**request_data)
+    new_hw = await homework_service.add_homework(request)
+    return new_hw.model_dump()
+
 # Methods mapping for A2AServer registration
 ACADOMIE_METHODS = {
     "message/send": handle_message_send,
+    "homework/list": handle_homework_list,
+    "homework/add": handle_homework_add,
 }

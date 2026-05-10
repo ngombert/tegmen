@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-10T20:11:18+02:00
-last_updated: 2026-05-10T20:25:03+02:00
+last_updated: 2026-05-10T22:15:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -45,7 +45,7 @@ development_status:
   # === ACA-Epic-1: Socle Asynchrone et Contrats A2A (Gestion Quotidienne MVP) ===
   epic-1: in-progress
   1-1-fondation-de-l-agent-et-starter-template-a2a: done
-  1-2-consultation-et-ajout-de-devoirs-mock-en-memoire: backlog
+  1-2-consultation-et-ajout-de-devoirs-mock-en-memoire: done
   1-3-consultation-du-calendrier-scolaire-mock-en-memoire: backlog
   epic-1-retrospective: optional
 
