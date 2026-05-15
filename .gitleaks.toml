@@ -1,0 +1,6 @@
+[allowlist]
+description = "Ignore BMad IDs and examples"
+paths = [
+    '''_bmad/.*''',
+    '''\.agent/skills/.*'''
+]

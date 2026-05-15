@@ -11,3 +11,6 @@ wheels/
 
 #bmad gemini
 .gemini
+
+# Secrets
+.env
