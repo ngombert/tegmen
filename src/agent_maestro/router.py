@@ -3,7 +3,7 @@
 from typing import Optional, Dict
 from semantic_router import Route
 from semantic_router.routers import SemanticRouter
-from semantic_router.encoders import HuggingFaceEncoder
+from semantic_router.encoders import HuggingFaceEncoder, OpenAIEncoder, LiteLLMEncoder
 from semantic_router.index import LocalIndex
 import numpy as np
 
@@ -11,10 +11,22 @@ from common.config import config
 from common.agent_registry import agent_registry
 from common.logger import setup_logger
 
+
 logger = setup_logger("router")
 
-# Initialize encoder with local model
-encoder = HuggingFaceEncoder(name=config.EMBEDDING_MODEL)
+# Initialize encoder based on model name
+embedding_model = getattr(config, "EMBEDDING_MODEL", "intfloat/multilingual-e5-small")
+
+if getattr(config, "USE_LITELLM_FOR_EMBEDDINGS", False) or embedding_model.startswith(("openrouter/", "gemini/", "mistral/", "vertex_ai/", "bedrock/")):
+    logger.info(f"Using LiteLLMEncoder (Agnostic) with model: {embedding_model}")
+    encoder = LiteLLMEncoder(name=embedding_model)
+elif embedding_model.startswith("text-embedding-"):
+    logger.info(f"Using OpenAIEncoder with model: {embedding_model}")
+    encoder = OpenAIEncoder(name=embedding_model)
+else:
+    logger.info(f"Using HuggingFaceEncoder with model: {embedding_model}")
+    encoder = HuggingFaceEncoder(name=embedding_model)
+
 
 # 1. System Internal Routes (Hardcoded as per user request)
 chitchat_route = Route(
