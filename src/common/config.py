@@ -15,6 +15,13 @@ class Settings:
     DEFAULT_MODEL: str = os.getenv(
         "DEFAULT_MODEL", "openrouter/google/gemini-2.0-flash-001"
     )
+    LLM_DEFAULT_MODEL: str = os.getenv(
+        "LLM_DEFAULT_MODEL", DEFAULT_MODEL
+    )
+
+    # OpenAI Configuration
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+
 
     # Database Configuration
     DATABASE_URL: str = os.getenv(
@@ -40,7 +47,8 @@ class Settings:
 
     # Agent URLs (A2A Communication)
     MAESTRO_URL: str = os.getenv("MAESTRO_URL", "http://localhost:8000")
-    DEFAULT_A2A_TIMEOUT: float = float(os.getenv("DEFAULT_A2A_TIMEOUT", "5.0"))
+    DEFAULT_A2A_TIMEOUT: float = float(os.getenv("DEFAULT_A2A_TIMEOUT", "30.0"))
+
 
     # Gourmet Resilience Configuration
     GOURMET_PERSISTENCE_TIMEOUT_MS: int = int(os.getenv("GOURMET_PERSISTENCE_TIMEOUT_MS", "3000"))
