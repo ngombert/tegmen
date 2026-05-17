@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# AI / Agentic specific
+.agent/
+.antigravity/
+.gemini/
+_bmad/
+_bmad-output/
+_plan/
+scratch/
+
+# IDE
+.vscode/
+
+# Documentation
+docs/
+README.md
+
+# Tests
+tests/
+
+# Project specific
+scripts/
