@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from agent_gourmet.main import app
+from unittest.mock import patch, AsyncMock
 
 @pytest.fixture
 def client():
@@ -13,8 +14,11 @@ def test_a2a_agent_card(client):
     assert data["name"] == "agent_gourmet"
     assert "search_recipes" in str(data["skills"])
 
-def test_a2a_send_message_search(client):
-    # Test message/send dispatching to search_recipes
+@patch("agent_gourmet.app.api.routers.a2a.LLMService.generate_response", new_callable=AsyncMock)
+def test_a2a_send_message_search(mock_generate, client):
+    # Test message/send using LLM
+    mock_generate.return_value = "Voici une délicieuse recette de carbonara."
+    
     payload = {
         "jsonrpc": "2.0",
         "method": "message/send",
@@ -36,6 +40,29 @@ def test_a2a_send_message_search(client):
     assert "messageId" in data["result"]
     assert data["result"]["contextId"] == "test-context-id"
     assert "carbonara" in data["result"]["parts"][0]["text"].lower()
+
+@patch("agent_gourmet.app.api.routers.a2a.LLMService.generate_response", new_callable=AsyncMock)
+def test_a2a_send_message_error(mock_generate, client):
+    # Test message/send when LLM fails
+    mock_generate.side_effect = Exception("LLM failure")
+    
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "message/send",
+        "params": {
+            "message": {
+                "role": "user",
+                "parts": [{"text": "recette carbonara"}]
+            },
+            "contextId": "test-context-id"
+        },
+        "id": "1"
+    }
+    response = client.post("/a2a/SendMessage", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "result" in data
+    assert "difficulté" in data["result"]["parts"][0]["text"]
 
 def test_a2a_direct_search(client):
     # Test direct JSON-RPC call to search_recipes

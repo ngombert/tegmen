@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from agent_gourmet.app.logger import setup_gourmet_logger
 from agent_gourmet.app.services.recipe_service import RecipeService
+from agent_gourmet.app.services.llm_service import LLMService
 from agent_gourmet.app.schemas.recipe import SearchRequest, RecipeDetailRequest, RecipeDetailResponse
 from common.exceptions import A2ARPCError
 from common.a2a_utils import format_a2a_message
@@ -76,6 +77,7 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     Handler for message/send JSON-RPC method (standard Tegmen chat).
     Dispatches to business logic based on natural language text.
     """
+    llm_service = LLMService()
     if not params or "message" not in params:
         raise A2ARPCError(
             code=A2ARPCError.INVALID_PARAMS,
@@ -100,21 +102,13 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     if not text:
         return format_a2a_message("Je n'ai pas bien compris votre message. Que cherchez-vous ?", context_id)
     
-    # Simple keyword-based dispatch for Lean Gourmet
-    if any(k in text for k in ["recette", "cherche", "propose", "manger"]):
-        # Very simple heuristic
-        query = text.replace("recette de", "").replace("cherche", "").replace("je veux", "").strip()
-        
-        request = SearchRequest(query=query)
-        response = await recipe_service.search_recipes(request)
-        
-        if response.total_count == 0:
-            return format_a2a_message(f"Désolé, je n'ai pas trouvé de recette pour '{query}'.", context_id)
-        
-        res_list = [r.name for r in response.results[:3]]
-        return format_a2a_message(f"Voici ce que j'ai trouvé : {', '.join(res_list)}. Laquelle vous intéresse ?", context_id)
-    
-    return format_a2a_message("Je suis l'agent Gourmet. Je peux vous aider à trouver des recettes. Que cherchez-vous ?", context_id)
+    # Use LLM to generate the response (Story 6.6)
+    try:
+        response_text = await llm_service.generate_response(text)
+        return format_a2a_message(response_text, context_id)
+    except Exception as e:
+        logger.error(f"Error calling LLM in handle_message_send: {e}")
+        return format_a2a_message("Désolé, je rencontre une difficulté pour vous répondre actuellement.", context_id)
 
 # Methods mapping for A2AServer registration
 GOURMET_METHODS = {
