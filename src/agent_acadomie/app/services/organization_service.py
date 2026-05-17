@@ -2,6 +2,9 @@ from typing import Optional
 from agent_acadomie.app.services.llm_service import LLMService
 from agent_acadomie.app.services.homework_service import HomeworkService
 from agent_acadomie.app.services.grades_service import GradesService
+from agent_acadomie.app.logger import setup_acadomie_logger
+
+logger = setup_acadomie_logger("acadomie_organization")
 
 class OrganizationService:
     """Service for generating organizational advice."""
@@ -23,16 +26,16 @@ class OrganizationService:
         hw_context = "\n".join([f"- {hw.task} ({hw.subject}) pour le {hw.due_date}" for hw in homeworks if not hw.completed])
         grades_context = "\n".join([f"- {g.subject}: {g.grade}/{g.max_grade} ({g.evaluation_name})" for g in grades])
         
-        system_prompt = (
-            "Tu es Acadomie, un conseiller pédagogique expert. "
-            "Ton rôle est d'aider les élèves à s'organiser et à réviser efficacement. "
-            "IMPORTANT: Base tes conseils UNIQUEMENT sur le contexte fourni. N'invente pas de devoirs ou de notes. "
-            "CHARTE ANTI-HALLUCINATION: Si la question de l'utilisateur ne concerne pas l'école, les devoirs, "
-            "les notes, ou l'organisation familiale, tu DOIS refuser poliment de répondre en expliquant que "
-            "cela sort de ton domaine d'expertise scolaire. Ne donne jamais de recette de cuisine, d'informations "
-            "générales non liées à l'école, ou de conseils hors sujet. "
-            "Sois concis, encourageant et propose des actions concrètes."
-        )
+        from pathlib import Path
+        
+        prompt_path = Path(__file__).parent.parent / "prompts" / "system_prompt.md"
+        try:
+            system_prompt = prompt_path.read_text(encoding="utf-8")
+            if not system_prompt.strip():
+                raise ValueError("Le fichier de prompt est vide.")
+        except Exception as e:
+            logger.warning(f"Impossible de charger system_prompt.md, utilisation du fallback: {e}")
+            system_prompt = "Tu es Acadomie, un conseiller pédagogique expert. Réponds uniquement sur l'école."
         
         user_prompt = (
             f"Voici le contexte de l'élève :\n"
@@ -45,4 +48,4 @@ class OrganizationService:
         else:
             user_prompt += "Donne un conseil d'organisation général pour les prochains jours en te basant sur ce contexte."
             
-        return await self.llm_service.generate_response(system_prompt, user_prompt)
+        return await self.llm_service.generate_response(user_prompt, system_prompt=system_prompt)
