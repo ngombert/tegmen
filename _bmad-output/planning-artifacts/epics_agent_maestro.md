@@ -349,3 +349,21 @@ So that mes intentions soient mieux comprises sans ambiguïté linguistique.
 **When** le routeur sémantique évalue la requête
 **Then** le score de confiance pour l'agent approprié est significativement supérieur à celui obtenu avec un modèle purement anglais
 **And** le système utilise un modèle d'embedding optimisé pour le français (ex: MiniLM-L12 multilingue ou E5-multilingual).
+
+## Epic 6: Agnosticisme et Flexibilité du Routage
+
+L'utilisateur peut utiliser n'importe quel fournisseur d'embeddings (OpenRouter, Google, Mistral, etc.) pour le routage sémantique, sans lock-in propriétaire.
+
+### Story 6.1: Encodeur Universel via LiteLLM
+
+As a Architecte/Développeur,
+I want un encodeur universel dans `semantic-router` qui utilise `LiteLLM`,
+So that je puisse utiliser n'importe quel modèle d'embedding supporté par LiteLLM (OpenRouter, Gemini, etc.) simplement en changeant la variable `EMBEDDING_MODEL`.
+
+**Acceptance Criteria:**
+
+**Given** la configuration d'un modèle d'embedding non-standard (ex: `openrouter/openai/text-embedding-3-small`)
+**When** le routeur sémantique s'initialise
+**Then** il utilise un `LiteLLMEncoder` personnalisé (ou `UniversalEncoder`)
+**And** les embeddings sont générés avec succès via l'API correspondante en appelant `litellm.embedding`.
+

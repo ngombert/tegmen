@@ -80,3 +80,12 @@ development_status:
   5-2-sticky-routing-affinite-d-agent: done
   5-3-commandes-d-evasion-et-reset: done
   epic-5-retrospective: ready-for-dev
+
+  # ── Epic 6: Transition vers un Moteur LLM Réel ────────────────────
+  epic-6: in-progress
+  6-1-configuration-securisee-des-modeles-reels: done
+  6-2-adaptation-des-timeouts-et-resilience-a2a: done
+  6-3-robustesse-de-la-validation-pydantic-face-au-llm: done
+  6-4-encodeur-universel-via-litellm: done
+  6-5-prompts-generiques-de-transition: backlog
+

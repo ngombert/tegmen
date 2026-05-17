@@ -62,3 +62,9 @@ development_status:
   3-3-structured-json-logging-et-zero-trust: done
   3-4-documentation-readme-agent: done
   epic-3-retrospective: done
+
+  # === Epic 6: Transition vers un Moteur LLM Réel ===
+  epic-6: in-progress
+  6-5-prompts-generiques-de-transition: done
+  6-6-connexion-llm-handlers-gourmet: review
+

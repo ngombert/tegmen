@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-10T20:11:18+02:00
-last_updated: 2026-05-10T23:11:00+02:00
+last_updated: 2026-05-16T17:20:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -61,3 +61,11 @@ development_status:
   3-2-charte-anti-hallucination-et-gestion-des-erreurs-a2a: done
   3-3-tests-de-resilience-et-chaos-testing: done
   epic-3-retrospective: optional
+
+  # === Epic 6: Transition vers un Moteur LLM Réel ===
+  epic-6: in-progress
+  6-1-configuration-securisee-des-modeles-reels: review
+  6-2-adaptation-des-timeouts-et-resilience-a2a: review
+  6-3-injection-des-cles-api-dans-le-router-maestro: review
+  6-5-prompts-generiques-de-transition: done
+
