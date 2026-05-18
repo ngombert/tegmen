@@ -46,46 +46,46 @@ development_status:
 
   # ── Epic 1: Fondation d'Accès et Couche d'Échange A2A ──────────────────────
   epic-1: done
-  1-1-librairie-commune-a2a-starter-template: done
-  1-2-creation-du-gateway-endpoint-public-maestro: done
-  1-3-auto-documentation-openapi-swagger: done
+  TRV-1-1-librairie-commune-a2a-starter-template: done
+  MAE-1-2-creation-du-gateway-endpoint-public-maestro: done
+  MAE-1-3-auto-documentation-openapi-swagger: done
   epic-1-retrospective: optional
 
   # ── Epic 2: Bouclier de Contexte Actif et Confidentialité (Privacy) ─────────
   epic-2: done
-  2-1-authentification-stricte-et-validation-jwt: done
-  2-2-filtre-pii-et-telemetrie-d-audit: done
-  2-3-hydratation-du-contexte-et-controle-parental-rbac: done
+  MAE-2-1-authentification-stricte-et-validation-jwt: done
+  MAE-2-2-filtre-pii-et-telemetrie-d-audit: done
+  MAE-2-3-hydratation-du-contexte-et-controle-parental-rbac: done
   epic-2-retrospective: optional
 
   # ── Epic 3: Routage Sémantique Intelligent In-Memory ───────────────────────
   epic-3: done
-  3-0-registre-d-agents-config-driven-et-nettoyage: done
-  3-1-integration-modele-vectoriel-in-memory: done
-  3-2-reception-et-routage-de-l-intention-dispatch-a2a: done
-  3-3-gestion-d-incompetence-et-fallback-local: done
+  MAE-3-0-registre-d-agents-config-driven-et-nettoyage: done
+  MAE-3-1-integration-modele-vectoriel-in-memory: done
+  MAE-3-2-reception-et-routage-de-l-intention-dispatch-a2a: done
+  MAE-3-3-gestion-d-incompetence-et-fallback-local: done
   epic-3-retrospective: done
 
   # ── Epic 4: Résilience Absolue et Dégradation Gracieuse ────────────────────
   epic-4: done
-  4-1-disjoncteur-temporel-fail-fast: done
-  4-2-interception-gracieuse-et-conversationnelle: done
-  4-3-observabilite-opentelemetry: done
-  4-4-diagnostic-trace-path: done
-  4-5-optimisation-linguistique-fr: done
+  MAE-4-1-disjoncteur-temporel-fail-fast: done
+  MAE-4-2-interception-gracieuse-et-conversationnelle: done
+  MAE-4-3-observabilite-opentelemetry: done
+  MAE-4-4-diagnostic-trace-path: done
+  MAE-4-5-optimisation-linguistique-fr: done
   epic-4-retrospective: done
   # ── Epic 5: Gestion de Session et Routage Contextuel ────────────────────
   epic-5: done
-  5-1-cache-memoire-et-session-store: done
-  5-2-sticky-routing-affinite-d-agent: done
-  5-3-commandes-d-evasion-et-reset: done
-  epic-5-retrospective: ready-for-dev
+  MAE-5-1-cache-memoire-et-session-store: done
+  MAE-5-2-sticky-routing-affinite-d-agent: done
+  MAE-5-3-commandes-d-evasion-et-reset: done
+  epic-5-retrospective: skipped
 
   # ── Epic 6: Transition vers un Moteur LLM Réel ────────────────────
-  epic-6: in-progress
-  6-1-configuration-securisee-des-modeles-reels: done
-  6-2-adaptation-des-timeouts-et-resilience-a2a: done
-  6-3-robustesse-de-la-validation-pydantic-face-au-llm: done
-  6-4-encodeur-universel-via-litellm: done
-  6-5-prompts-generiques-de-transition: backlog
+  epic-6: done
+  TRV-6-1-configuration-securisee-des-modeles-reels: done
+  TRV-6-2-adaptation-des-timeouts-et-resilience-a2a: done
+  MAE-6-3-robustesse-de-la-validation-pydantic-face-au-llm: done
+  MAE-6-4-encodeur-universel-via-litellm: done
+  TRV-6-5-prompts-generiques-de-transition: done
 

@@ -44,27 +44,27 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
 development_status:
   # Epic 1: Recherche et Découverte de Recettes
   epic-1: done
-  1-1-fondation-a2a-et-structure-agent-gourmet: done
-  1-2-recherche-de-recettes-basique: done
-  1-3-filtres-avances-et-pagination: done
+  GOU-1-1-fondation-a2a-et-structure-agent-gourmet: done
+  GOU-1-2-recherche-de-recettes-basique: done
+  GOU-1-3-filtres-avances-et-pagination: done
   epic-1-retrospective: done
 
   # Epic 2: Consultation Détaillée d'une Recette
   epic-2: done
-  2-1-extraction-complete-d-une-recette: done
-  2-2-fail-fast-sur-recette-inexistante: done
+  GOU-2-1-extraction-complete-d-une-recette: done
+  GOU-2-2-fail-fast-sur-recette-inexistante: done
   epic-2-retrospective: optional
 
   # Epic 3: Résilience, Observabilité et Intégration Écosystème
   epic-3: done
-  3-1-timeout-persistance-et-chaos-testing: done
-  3-2-observabilite-correlation-id-et-traces: done
-  3-3-structured-json-logging-et-zero-trust: done
-  3-4-documentation-readme-agent: done
+  GOU-3-1-timeout-persistance-et-chaos-testing: done
+  GOU-3-2-observabilite-correlation-id-et-traces: done
+  GOU-3-3-structured-json-logging-et-zero-trust: done
+  GOU-3-4-documentation-readme-agent: done
   epic-3-retrospective: done
 
   # === Epic 6: Transition vers un Moteur LLM Réel ===
   epic-6: in-progress
-  6-5-prompts-generiques-de-transition: done
-  6-6-connexion-llm-handlers-gourmet: review
+  TRV-6-5-prompts-generiques-de-transition: done
+  GOU-6-6-connexion-llm-handlers-gourmet: done
 

@@ -44,28 +44,28 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   # === ACA-Epic-1: Socle Asynchrone et Contrats A2A (Gestion Quotidienne MVP) ===
   epic-1: done
-  1-1-fondation-de-l-agent-et-starter-template-a2a: done
-  1-2-consultation-et-ajout-de-devoirs-mock-en-memoire: done
-  1-3-consultation-du-calendrier-scolaire-mock-en-memoire: done
+  ACA-1-1-fondation-de-l-agent-et-starter-template-a2a: done
+  ACA-1-2-consultation-et-ajout-de-devoirs-mock-en-memoire: done
+  ACA-1-3-consultation-du-calendrier-scolaire-mock-en-memoire: done
   epic-1-retrospective: optional
 
   # === ACA-Epic-2: Suivi Académique et Logique LLM (Notes et Organisation) ===
   epic-2: done
-  2-1-consultation-des-notes-par-matiere-avec-controle-d-acces: done
-  2-2-generation-de-conseils-d-organisation-via-inference-llm: done
+  ACA-2-1-consultation-des-notes-par-matiere-avec-controle-d-acces: done
+  ACA-2-2-generation-de-conseils-d-organisation-via-inference-llm: done
   epic-2-retrospective: optional
 
   # === ACA-Epic-3: Intégration Écosystème et Résilience ===
   epic-3: done
-  3-1-observabilite-et-tracabilite-logging-structure-et-correlation-id: done
-  3-2-charte-anti-hallucination-et-gestion-des-erreurs-a2a: done
-  3-3-tests-de-resilience-et-chaos-testing: done
+  ACA-3-1-observabilite-et-tracabilite-logging-structure-et-correlation-id: done
+  ACA-3-2-charte-anti-hallucination-et-gestion-des-erreurs-a2a: done
+  ACA-3-3-tests-de-resilience-et-chaos-testing: done
   epic-3-retrospective: optional
 
   # === Epic 6: Transition vers un Moteur LLM Réel ===
   epic-6: in-progress
-  6-1-configuration-securisee-des-modeles-reels: review
-  6-2-adaptation-des-timeouts-et-resilience-a2a: review
-  6-3-injection-des-cles-api-dans-le-router-maestro: review
-  6-5-prompts-generiques-de-transition: done
+  TRV-6-1-configuration-securisee-des-modeles-reels: done
+  TRV-6-2-adaptation-des-timeouts-et-resilience-a2a: done
+  ACA-6-3-injection-des-cles-api-dans-le-router-maestro: done
+  TRV-6-5-prompts-generiques-de-transition: done
 
