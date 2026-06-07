@@ -56,10 +56,10 @@ def verify():
     
     for query, expected in TEST_CASES:
         predicted = classify_intent(query)
-        result = "✅" if predicted == expected else f"❌ (got {predicted})"
+        result = "✅" if predicted[0] == expected else f"❌ (got {predicted})"
         print(f"{result} Query: '{query}' -> Expected: {expected}")
         
-        if predicted == expected:
+        if predicted[0] == expected:
             passed += 1
             
     print(f"\n📊 Result: {passed}/{total} passed ({passed/total*100:.1f}%)")

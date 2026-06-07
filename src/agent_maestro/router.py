@@ -108,6 +108,23 @@ def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[s
     if not scores:
         return ("unknown", 0.0)
 
+    # Check for Party Mode triggers
+    party_keywords = ["party mode", "tous les agents", "toute la famille", "consulte tout le monde", "demande à tout le monde", "demande a tout le monde", "consulter la famille"]
+    if any(kw in message.lower() for kw in party_keywords):
+        return ("party", 1.0)
+
+    # Check semantic route overlap
+    # We only trigger Party Mode semantically if:
+    # 1. We have at least 2 specialized routes.
+    # 2. Both have scores >= THRESHOLD_ROUTING.
+    # 3. The difference between the top 2 specialized scores is extremely small (<= 0.01)
+    specialized_scores = {r: s for r, s in scores.items() if r != "chitchat"}
+    if len(specialized_scores) >= 2:
+        sorted_scores = sorted(specialized_scores.values(), reverse=True)
+        if sorted_scores[0] >= THRESHOLD_ROUTING and sorted_scores[1] >= THRESHOLD_ROUTING:
+            if (sorted_scores[0] - sorted_scores[1]) <= 0.01:
+                return ("party", 1.0)
+
     if active_agent:
         # Normalize active_agent to route name (e.g. agent_gourmet -> gourmet)
         active_route = active_agent[6:] if active_agent.startswith("agent_") else active_agent

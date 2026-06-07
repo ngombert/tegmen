@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-19T22:09:47+02:00
-last_updated: 2026-05-29T20:10:00+02:00
+last_updated: 2026-06-07T22:05:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -49,10 +49,10 @@ development_status:
   epic-1-retrospective: optional
 
   # ── Epic 2: Routage Intelligent et Résilient ───────────────────────────────
-  epic-2: backlog
-  2-1-integrite-du-protocole-a2a-et-retrocompatibilite: backlog
-  2-2-routage-unitaire-et-clarification: backlog
-  2-3-routage-parallele-automatique-party-mode-et-resilience: backlog
+  epic-2: done
+  2-1-integrite-du-protocole-a2a-et-retrocompatibilite: done
+  2-2-routage-unitaire-et-clarification: done
+  2-3-routage-parallele-automatique-party-mode-et-resilience: done
   epic-2-retrospective: optional
 
   # ── Epic 3: Fluidité Conversationnelle (Gestion des Interruptions) ─────────
