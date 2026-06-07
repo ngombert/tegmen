@@ -5,8 +5,8 @@ import uuid
 import random
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Optional
-
+from typing import Optional, Any
+from sqlalchemy import select, delete
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,10 +23,91 @@ from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError, Reques
 from common.logger import setup_logger
 from common.tracing import setup_tracing, instrument_app, instrument_client
 from agent_maestro.session import InMemorySessionStore
+from agent_maestro.app.db import session as maestro_db_session
+from agent_maestro.app.db.models.context import Context
 
 logger = setup_logger("maestro")
 
 session_store = InMemorySessionStore()
+
+async def push_context(session_id: str, agent: str, context_data: dict = None) -> None:
+    """Push a suspended agent context to the DB stack."""
+    if not session_id:
+        return
+    async with maestro_db_session.async_session_factory() as session:
+        async with session.begin():
+            db_context = Context(
+                session_id=session_id,
+                agent=agent,
+                context_data=context_data or {}
+            )
+            session.add(db_context)
+            logger.info(f"Context Stack | Pushed '{agent}' for session {session_id}")
+
+async def pop_context(session_id: str) -> tuple[str, dict] | None:
+    """Pop the most recent suspended context for the session."""
+    if not session_id:
+        return None
+    async with maestro_db_session.async_session_factory() as session:
+        async with session.begin():
+            stmt = (
+                select(Context)
+                .where(Context.session_id == session_id)
+                .order_by(Context.created_at.desc())
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            db_context = result.scalar_one_or_none()
+            if db_context:
+                agent = db_context.agent
+                context_data = db_context.context_data
+                await session.delete(db_context)
+                logger.info(f"Context Stack | Popped '{agent}' for session {session_id}")
+                return agent, context_data
+    return None
+
+async def clear_contexts(session_id: str) -> None:
+    """Clear all suspended contexts for the session."""
+    if not session_id:
+        return
+    async with maestro_db_session.async_session_factory() as session:
+        async with session.begin():
+            stmt = delete(Context).where(Context.session_id == session_id)
+            await session.execute(stmt)
+            logger.info(f"Context Stack | Cleared all contexts for session {session_id}")
+
+async def prune_zombie_contexts(session_id: str) -> None:
+    """Prune context stack if it exceeds age threshold (5 minutes)."""
+    if not session_id:
+        return
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+    async with maestro_db_session.async_session_factory() as session:
+        async with session.begin():
+            stmt = delete(Context).where(
+                (Context.session_id == session_id) & (Context.created_at < cutoff)
+            )
+            await session.execute(stmt)
+
+def extract_text_from_result(result: Any) -> str:
+    """Helper to extract text response from raw A2A JSON-RPC result."""
+    if result:
+        if isinstance(result, dict):
+            if "parts" in result:
+                for part in result["parts"]:
+                    if isinstance(part, dict) and "text" in part:
+                        return part["text"]
+            if "message" in result:
+                return result["message"]
+            if "text" in result:
+                return result["text"]
+        if hasattr(result, "parts") and result.parts:
+            for part in result.parts:
+                if hasattr(part, "root") and hasattr(part.root, "text"):
+                    return part.root.text
+                if hasattr(part, "text"):
+                    return part.text
+    return str(result)
 
 
 # Initialized with Lean A2A standards
@@ -51,16 +132,14 @@ async def lifespan(app: FastAPI):
         logger.info(f"   - {agent['name']}: {agent['url']}")
     
     # Initialize DB engine connection log
-    from agent_maestro.app.db.session import engine as db_engine
     logger.info("🗄️ Database engine initialized for Maestro.")
     
     yield
     
     # Clean up DB engine
     try:
-        from agent_maestro.app.db.session import engine as db_engine
         logger.info("🔌 Disposing Database engine for Maestro...")
-        await db_engine.dispose()
+        await maestro_db_session.engine.dispose()
     except Exception as e:
         logger.error(f"Failed to dispose Database engine for Maestro: {e}", exc_info=True)
     logger.info("👋 Shutting down Tegmen Maestro...")
@@ -169,9 +248,17 @@ from common.exceptions import A2ARPCError
 async def is_escape_command(raw_message: str, session_id: Optional[str]) -> bool:
     if not raw_message:
         return False
-    if raw_message.strip().lower() in ESCAPE_COMMANDS:
+    clean_msg = raw_message.strip().lower()
+    is_escape = (
+        clean_msg in ESCAPE_COMMANDS
+        or "laisse tomber ce sujet" in clean_msg
+        or "laisse tomber" in clean_msg
+        or "abandonne" in clean_msg
+    )
+    if is_escape:
         if session_id:
             await session_store.delete(session_id)
+            await clear_contexts(session_id)
         return True
     return False
 
@@ -390,6 +477,24 @@ async def route_request(
 
     active_agent = await session_store.get(session_id) if session_id else None
 
+    if session_id:
+        await prune_zombie_contexts(session_id)
+        # Update digression message count
+        async with maestro_db_session.async_session_factory() as session:
+            async with session.begin():
+                stmt = select(Context).where(Context.session_id == session_id).order_by(Context.created_at.desc()).limit(1)
+                res = await session.execute(stmt)
+                db_ctx = res.scalar_one_or_none()
+                if db_ctx:
+                    data = dict(db_ctx.context_data)
+                    count = data.get("digression_messages", 0) + 1
+                    if count >= 3:
+                        logger.info(f"Context Stack | Garbage collecting context because digression exceeded 3 messages.")
+                        await session.delete(db_ctx)
+                    else:
+                        data["digression_messages"] = count
+                        db_ctx.context_data = data
+
     is_party = False
     target_routes = []
 
@@ -497,14 +602,49 @@ async def route_request(
             agent_name = "maestro"
         elif score >= THRESHOLD_ROUTING:
             # High confidence -> Direct dispatch
-            response_text = await call_remote_agent(
+            raw_response = await call_remote_agent(
                 route=route,
                 message=message,
                 context_id=session_id or str(request.id),
+                return_raw=True,
             )
-            agent_name = f"agent_{route}"
-            if session_id:
-                await session_store.set(session_id, agent_name)
+            if isinstance(raw_response, dict) and raw_response.get("status") == "yield":
+                # active agent yielded!
+                # 1. Push active agent to stack with digression_messages=0
+                if session_id and active_agent:
+                    await push_context(session_id, active_agent, {"digression_messages": 0})
+                
+                # 2. Re-classify intent without active agent to find the new route (digression)
+                route, score = classify_intent(message, active_agent=None)
+                logger.info(f"Yield transition | Re-routing to route={route}, score={score:.4f}")
+                
+                # 3. Call the digression agent
+                digression_response = await call_remote_agent(
+                    route=route,
+                    message=message,
+                    context_id=session_id or str(request.id),
+                    return_raw=True,
+                )
+                if isinstance(digression_response, dict) and digression_response.get("status") == "yield":
+                    # Double yield — both agents can't handle this. Pop and restore.
+                    response_text = digression_response.get("message", "Je ne peux pas répondre actuellement.")
+                    agent_name = "maestro"
+                    if session_id:
+                        restored = await pop_context(session_id)
+                        if restored:
+                            restored_agent, _ = restored
+                            await session_store.set(session_id, restored_agent)
+                else:
+                    response_text = extract_text_from_result(digression_response)
+                    agent_name = f"agent_{route}"
+                    # Switch active agent to digression agent; context stays in stack
+                    if session_id:
+                        await session_store.set(session_id, agent_name)
+            else:
+                response_text = extract_text_from_result(raw_response)
+                agent_name = f"agent_{route}"
+                if session_id:
+                    await session_store.set(session_id, agent_name)
         elif score >= THRESHOLD_CLARIFICATION:
             # Medium confidence -> Clarification
             agent_display = route.capitalize()
@@ -598,7 +738,25 @@ async def chat(
     # Step 1: Classify intent with semantic router
     logger.info(f"Processing message for {context.user_name}: '{sanitized_message}'")
     active_agent = await session_store.get(session_id) if session_id else None
-        
+
+    if session_id:
+        await prune_zombie_contexts(session_id)
+        # Update digression message count
+        async with maestro_db_session.async_session_factory() as session:
+            async with session.begin():
+                stmt = select(Context).where(Context.session_id == session_id).order_by(Context.created_at.desc()).limit(1)
+                res = await session.execute(stmt)
+                db_ctx = res.scalar_one_or_none()
+                if db_ctx:
+                    data = dict(db_ctx.context_data)
+                    count = data.get("digression_messages", 0) + 1
+                    if count >= 3:
+                        logger.info(f"Context Stack | Garbage collecting context because digression exceeded 3 messages.")
+                        await session.delete(db_ctx)
+                    else:
+                        data["digression_messages"] = count
+                        db_ctx.context_data = data
+
     is_party = False
     target_routes = []
 
@@ -670,14 +828,49 @@ async def chat(
             agent_name = "maestro"
         elif score >= THRESHOLD_ROUTING:
             # Step 2: Call remote specialized agent via A2A
-            response_text = await call_remote_agent(
+            raw_response = await call_remote_agent(
                 route=route,
                 message=sanitized_message,
                 context_id=session_id,
+                return_raw=True,
             )
-            agent_name = f"agent_{route}"
-            if session_id:
-                await session_store.set(session_id, agent_name)
+            if isinstance(raw_response, dict) and raw_response.get("status") == "yield":
+                # active agent yielded!
+                # 1. Push active agent to stack with digression_messages=0
+                if session_id and active_agent:
+                    await push_context(session_id, active_agent, {"digression_messages": 0})
+                
+                # 2. Re-classify intent without active agent to find the new route (digression)
+                route, score = classify_intent(sanitized_message, active_agent=None)
+                logger.info(f"Yield transition (legacy) | Re-routing to route={route}, score={score:.4f}")
+                
+                # 3. Call the digression agent
+                digression_response = await call_remote_agent(
+                    route=route,
+                    message=sanitized_message,
+                    context_id=session_id,
+                    return_raw=True,
+                )
+                if isinstance(digression_response, dict) and digression_response.get("status") == "yield":
+                    # Double yield — both agents can't handle this. Pop and restore.
+                    response_text = digression_response.get("message", "Je ne peux pas répondre actuellement.")
+                    agent_name = "maestro"
+                    if session_id:
+                        restored = await pop_context(session_id)
+                        if restored:
+                            restored_agent, _ = restored
+                            await session_store.set(session_id, restored_agent)
+                else:
+                    response_text = extract_text_from_result(digression_response)
+                    agent_name = f"agent_{route}"
+                    # Switch active agent to digression agent; context stays in stack
+                    if session_id:
+                        await session_store.set(session_id, agent_name)
+            else:
+                response_text = extract_text_from_result(raw_response)
+                agent_name = f"agent_{route}"
+                if session_id:
+                    await session_store.set(session_id, agent_name)
         elif score >= THRESHOLD_CLARIFICATION:
             # Clarification
             agent_display = route.capitalize()

@@ -56,10 +56,10 @@ development_status:
   epic-2-retrospective: optional
 
   # ── Epic 3: Fluidité Conversationnelle (Gestion des Interruptions) ─────────
-  epic-3: backlog
-  3-1-detection-hors-domaine-pattern-yield: backlog
-  3-2-pile-de-contexte-suspend-et-resume: backlog
-  3-3-nettoyage-et-cloture-du-contexte-garbage-collection: backlog
+  epic-3: done
+  3-1-detection-hors-domaine-pattern-yield: done
+  3-2-pile-de-contexte-suspend-et-resume: done
+  3-3-nettoyage-et-cloture-du-contexte-garbage-collection: done
   epic-3-retrospective: optional
 
   # ── Epic 4: Mémoire Personnalisée et Raisonnement Croisé ───────────────────
