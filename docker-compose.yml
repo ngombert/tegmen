@@ -4,20 +4,22 @@ services:
   # ===================
 
   db:
-    image: postgres:18-alpine
+    image: pgvector/pgvector:pg18
     container_name: tegmen-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_MULTIPLE_DATABASES: maestro,gourmet,acadomie,explorer
     volumes:
-      - tegmen_postgres_data:/var/lib/postgresql/18/docker
+      - tegmen_postgres_data:/var/lib/postgresql
       - ./scripts/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+      - ./scripts/verify-db-init.sh:/scripts/verify-db-init.sh
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
     ports:
       - "5432:5432"
 
@@ -31,6 +33,8 @@ services:
       dockerfile: src/agent_gourmet/Dockerfile
     container_name: tegmen-agent-gourmet
     profiles: ["gourmet", "all", "agents"]
+    env_file:
+      - .env
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://gourmet:gourmet@db:5432/gourmet
@@ -50,8 +54,14 @@ services:
       dockerfile: src/agent_acadomie/Dockerfile
     container_name: tegmen-agent-acadomie
     profiles: ["acadomie", "all", "agents"]
+    env_file:
+      - .env
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DATABASE_URL=postgresql+asyncpg://acadomie:acadomie@db:5432/acadomie
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8002:8000"
     volumes:
@@ -64,7 +74,9 @@ services:
       context: .
       dockerfile: src/agent_explorer/Dockerfile
     container_name: tegmen-agent-explorer
-    profiles: ["explorer", "all", "agents"]
+    profiles: ["explorer", "agents"]
+    env_file:
+      - .env
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://explorer:explorer@db:5432/explorer
@@ -83,6 +95,8 @@ services:
       dockerfile: src/agent_maestro/Dockerfile
     container_name: tegmen-maestro
     profiles: ["maestro", "all"]
+    env_file:
+      - .env
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DATABASE_URL=postgresql+asyncpg://maestro:maestro@db:5432/maestro
