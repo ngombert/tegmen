@@ -105,6 +105,17 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     # Use LLM to generate the response (Story 6.6)
     try:
         response_text = await llm_service.generate_response(text)
+        if "[yield]" in response_text.lower():
+            yield_marker = "[yield]"
+            idx = response_text.lower().find(yield_marker)
+            message = response_text[idx + len(yield_marker):].strip()
+            if not message:
+                message = "Je suis l'agent Gourmet et je passe la main."
+            return {
+                "status": "yield",
+                "message": message,
+                "context_stack": []
+            }
         return format_a2a_message(response_text, context_id)
     except Exception as e:
         logger.error(f"Error calling LLM in handle_message_send: {e}")

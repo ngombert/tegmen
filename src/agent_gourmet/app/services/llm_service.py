@@ -18,6 +18,9 @@ class LLMService:
         use_mock = os.getenv("USE_MOCK_LLM", "false").lower() == "true"
         if use_mock:
             logger.info("Using Mock LLM mode")
+            off_topic_keywords = ["devoir", "scolaire", "math", "calendrier", "note", "cours", "prof", "école", "ecole"]
+            if any(kw in user_prompt.lower() for kw in off_topic_keywords):
+                return "[YIELD] Je suis l'agent Gourmet et je ne peux répondre qu'aux questions culinaires."
             return "Ceci est une réponse simulée (Mock LLM) pour l'agent Gourmet."
 
         if system_prompt is None:

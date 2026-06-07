@@ -92,6 +92,15 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     if not text:
         return format_a2a_message("Je n'ai pas bien compris votre message. Comment puis-je vous aider pour l'école ?", context_id)
     
+    # Check for Yield (out-of-domain)
+    off_topic_keywords = ["recette", "cuisine", "repas", "plat", "ingrédient", "dîner", "diner", "gâteau", "gateau"]
+    if any(kw in text for kw in off_topic_keywords):
+        return {
+            "status": "yield",
+            "message": "Je suis l'agent Acadomie et je ne peux répondre qu'aux questions scolaires.",
+            "context_stack": []
+        }
+    
     # Simple keyword-based dispatch for Lean Acadomie
     if any(k in text for k in ["devoir", "exercice", "leçon"]):
         return format_a2a_message("Je peux vous aider avec les devoirs. Que souhaitez-vous consulter ou ajouter ?", context_id)
