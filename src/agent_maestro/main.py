@@ -3,6 +3,7 @@
 import os
 import uuid
 import random
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -145,7 +146,7 @@ FALLBACK_RESPONSES = [
     "Désolé, l'agent spécialisé semble faire une petite pause... Je ne peux pas lui parler pour le moment. 😴",
     "Oups ! J'ai un petit souci technique pour joindre mon collègue. On réessaie dans un instant ? 🛠️",
     "Mince, la connexion avec l'agent spécialisé a été coupée. Je suis navré de ce contretemps ! 🔌",
-    "Je n'arrive pas à obtenir de réponse de l'agent pour le moment. Je reste à votre disposition pour autre chose ! ✨",
+    "Désolé, je n'arrive pas à obtenir de réponse de l'agent pour le moment. Je reste à votre disposition pour autre chose ! ✨",
 ]
 
 # Template for ambiguous intents
@@ -173,6 +174,112 @@ async def is_escape_command(raw_message: str, session_id: Optional[str]) -> bool
             await session_store.delete(session_id)
         return True
     return False
+
+def detect_explicit_agent(message: str) -> str | None:
+    """Detect if the user is explicitly naming/asking for a specific agent."""
+    if not message:
+        return None
+    msg_lower = message.lower()
+    agents = ["gourmet", "acadomie", "explorer"]
+    triggers = ["demande à", "demande a", "parle à", "parle a", "invoque", "appelle", "lance", "agent"]
+    
+    for agent in agents:
+        if msg_lower.startswith(f"{agent}:") or msg_lower.startswith(f"agent {agent}:"):
+            return agent
+        if msg_lower.startswith(f"{agent},") or msg_lower.startswith(f"{agent} "):
+            return agent
+        for trigger in triggers:
+            if f"{trigger} {agent}" in msg_lower or f"{agent} {trigger}" in msg_lower:
+                return agent
+    return None
+
+def detect_correction(message: str) -> str | None:
+    """Detect if the user is manually correcting a routing error a posteriori."""
+    if not message:
+        return None
+    msg_lower = message.lower()
+    agents = ["gourmet", "acadomie", "explorer"]
+    correction_keywords = ["non", "pas", "trompé", "trompe", "erreur", "c'était pour", "c'etait pour", "je voulais", "plutôt", "plutot"]
+    
+    has_correction = any(kw in msg_lower for kw in correction_keywords)
+    if has_correction:
+        for agent in agents:
+            if agent in msg_lower:
+                return agent
+    return None
+
+def is_pure_correction(message: str) -> bool:
+    """Detect if the message is only a routing correction with no other query context."""
+    if not message:
+        return False
+    import string
+    msg = message.lower().strip()
+    msg_clean = msg.translate(str.maketrans("", "", string.punctuation))
+    words = msg_clean.split()
+    if len(words) <= 5:
+        keywords = {
+            "non", "pas", "trompé", "trompe", "erreur", "c'était", "c'etait", "cétait", "cetait",
+            "pour", "je", "voulais", "plutôt", "plutot", "gourmet", "acadomie", 
+            "explorer", "agent"
+        }
+        if all(w in keywords for w in words):
+            return True
+    return False
+
+async def generate_synthesis(query: str, agent_responses: dict[str, str]) -> str:
+    """Synthesize responses from multiple agents using the LLM."""
+    if os.getenv("USE_MOCK_LLM", "false").lower() == "true":
+        responses_summary = ", ".join([f"{agent}: {resp}" for agent, resp in agent_responses.items()])
+        return f"[Synthèse] Réponses croisées de la famille pour '{query}': {responses_summary}"
+        
+    import litellm
+    system_prompt = (
+        "Tu es Tegmen Maestro, l'assistant et le chef d'orchestre de la famille. "
+        "Tu as consulté plusieurs agents spécialistes pour répondre à la question de l'utilisateur. "
+        "Synthétise leurs réponses de manière cohérente, chaleureuse et concise, en éliminant les répétitions et en croisant les informations utiles."
+    )
+    
+    user_prompt = f"Question de l'utilisateur : {query}\n\nRéponses des experts consultés :\n"
+    for agent, response in agent_responses.items():
+        user_prompt += f"- {agent.capitalize()} : {response}\n"
+    
+    user_prompt += "\nGénère la synthèse finale."
+    
+    try:
+        response = await asyncio.wait_for(
+            litellm.acompletion(
+                model=config.LLM_DEFAULT_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+            ),
+            timeout=10.0
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        logger.error(f"Error generating synthesis: {e}")
+        fallback_msg = "Voici les avis de la famille :\n"
+        for agent, resp in agent_responses.items():
+            fallback_msg += f"- {agent.capitalize()} : {resp}\n"
+        return fallback_msg
+
+async def call_single_agent(route: str, message: str, context_id: str, context: RequestContext) -> tuple[str, str | None]:
+    """Call a single remote agent with a strict timeout and catch errors."""
+    try:
+        resp = await call_remote_agent(
+            route=route,
+            message=message,
+            context_id=context_id,
+            timeout=10.0,
+            context=context
+        )
+        return route, resp
+    except Exception as e:
+        logger.warning(f"Party Mode | Agent '{route}' failed or timed out: {e}")
+        return route, None
+
 
 @app.get("/dev/token/{user_id}", tags=["Development"])
 async def get_dev_token(user_id: str):
@@ -283,12 +390,66 @@ async def route_request(
 
     active_agent = await session_store.get(session_id) if session_id else None
 
-    # Classify intent
-    route, score = classify_intent(message, active_agent) if message else ("unknown", 0.0)
+    is_party = False
+    target_routes = []
+
+    # Check for manual routing correction
+    corrected_agent = detect_correction(message)
+    if corrected_agent:
+        logger.info(f"Manual routing correction detected: target={corrected_agent}")
+        if is_pure_correction(message):
+            if session_id:
+                await session_store.set(session_id, f"agent_{corrected_agent}")
+            return JsonRpcResponse(
+                jsonrpc="2.0",
+                result={
+                    "message": f"D'accord, je redirige notre conversation vers l'agent {corrected_agent.capitalize()}. Que souhaitez-vous lui demander ?",
+                    "agent": "maestro",
+                    "route": corrected_agent
+                },
+                id=request.id
+            )
+        else:
+            route = corrected_agent
+            score = 1.0
+            if session_id:
+                await session_store.set(session_id, f"agent_{route}")
+    else:
+        # Check for explicit agent invocation
+        explicit_agent = detect_explicit_agent(message)
+        if explicit_agent:
+            logger.info(f"Explicit agent routing detected: target={explicit_agent}")
+            route = explicit_agent
+            score = 1.0
+        else:
+            # Classify intent
+            route, score = classify_intent(message, active_agent) if message else ("unknown", 0.0)
+
     logger.info(f"🎯 Intent classified: route='{route}', score={score:.4f}")
 
+    if route == "party":
+        party_keywords = ["party mode", "tous les agents", "toute la famille", "consulte tout le monde", "demande à tout le monde", "demande a tout le monde", "consulter la famille"]
+        if any(kw in message.lower() for kw in party_keywords):
+            target_routes = [agent["name"] for agent in agent_registry.list_agents() if agent["name"] != "maestro"]
+        else:
+            scores = get_all_scores(message)
+            specialized_routes = [r for r, s in scores.items() if r != "chitchat" and s >= THRESHOLD_CLARIFICATION]
+            specialized_routes.sort(key=lambda r: scores[r], reverse=True)
+            target_routes = specialized_routes
+
     # RBAC Check
-    check_agent_access(f"agent_{route}", context)
+    if route != "party":
+        check_agent_access(f"agent_{route}", context)
+    else:
+        # Filter target routes by RBAC before calling
+        allowed_routes = []
+        for r in target_routes:
+            try:
+                check_agent_access(f"agent_{r}", context)
+                allowed_routes.append(r)
+            except HTTPException:
+                logger.warning(f"Party Mode | Filtered out agent_{r} due to RBAC restrictions for user {context.user_id}")
+        target_routes = allowed_routes
 
     # Check for debug mode (admin only)
     is_admin = context.role == "parent"
@@ -321,7 +482,17 @@ async def route_request(
                 debug_info["trace_id"] = format(span.get_span_context().trace_id, '032x')
 
     try:
-        if route == "chitchat" and score >= THRESHOLD_ROUTING:
+        if route == "party":
+            # Invoke target agents in parallel
+            tasks = [call_single_agent(r, message, session_id or str(request.id), context) for r in target_routes]
+            results = await asyncio.gather(*tasks)
+            successful_responses = {r: resp for r, resp in results if resp is not None}
+            if not successful_responses:
+                response_text = random.choice(FALLBACK_RESPONSES)
+            else:
+                response_text = await generate_synthesis(message, successful_responses)
+            agent_name = "maestro"
+        elif route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
         elif score >= THRESHOLD_ROUTING:
@@ -428,14 +599,73 @@ async def chat(
     logger.info(f"Processing message for {context.user_name}: '{sanitized_message}'")
     active_agent = await session_store.get(session_id) if session_id else None
         
-    route, score = classify_intent(sanitized_message, active_agent)
+    is_party = False
+    target_routes = []
+
+    corrected_agent = detect_correction(sanitized_message)
+    if corrected_agent:
+        logger.info(f"Manual routing correction detected (legacy): target={corrected_agent}")
+        if is_pure_correction(sanitized_message):
+            if session_id:
+                await session_store.set(session_id, f"agent_{corrected_agent}")
+            return ChatResponse(
+                message=f"D'accord, je redirige notre conversation vers l'agent {corrected_agent.capitalize()}. Que souhaitez-vous lui demander ?",
+                agent="maestro",
+                session_id=session_id or "",
+                route=corrected_agent,
+            )
+        else:
+            route = corrected_agent
+            score = 1.0
+            if session_id:
+                await session_store.set(session_id, f"agent_{route}")
+    else:
+        explicit_agent = detect_explicit_agent(sanitized_message)
+        if explicit_agent:
+            logger.info(f"Explicit agent routing detected (legacy): target={explicit_agent}")
+            route = explicit_agent
+            score = 1.0
+        else:
+            route, score = classify_intent(sanitized_message, active_agent)
+            
     logger.info(f"Routing decision: route='{route}', score={score:.4f}")
+
+    if route == "party":
+        party_keywords = ["party mode", "tous les agents", "toute la famille", "consulte tout le monde", "demande à tout le monde", "demande a tout le monde", "consulter la famille"]
+        if any(kw in sanitized_message.lower() for kw in party_keywords):
+            target_routes = [agent["name"] for agent in agent_registry.list_agents() if agent["name"] != "maestro"]
+        else:
+            scores = get_all_scores(sanitized_message)
+            specialized_routes = [r for r, s in scores.items() if r != "chitchat" and s >= THRESHOLD_CLARIFICATION]
+            specialized_routes.sort(key=lambda r: scores[r], reverse=True)
+            target_routes = specialized_routes
     
     # Step 1.5: RBAC Check
-    check_agent_access(f"agent_{route}", context)
+    if route != "party":
+        check_agent_access(f"agent_{route}", context)
+    else:
+        # Filter target routes by RBAC before calling
+        allowed_routes = []
+        for r in target_routes:
+            try:
+                check_agent_access(f"agent_{r}", context)
+                allowed_routes.append(r)
+            except HTTPException:
+                logger.warning(f"Party Mode (legacy) | Filtered out agent_{r} due to RBAC restrictions")
+        target_routes = allowed_routes
 
     try:
-        if route == "chitchat" and score >= THRESHOLD_ROUTING:
+        if route == "party":
+            # Invoke target agents in parallel
+            tasks = [call_single_agent(r, sanitized_message, session_id or str(uuid.uuid4()), context) for r in target_routes]
+            results = await asyncio.gather(*tasks)
+            successful_responses = {r: resp for r, resp in results if resp is not None}
+            if not successful_responses:
+                response_text = random.choice(FALLBACK_RESPONSES)
+            else:
+                response_text = await generate_synthesis(sanitized_message, successful_responses)
+            agent_name = "maestro"
+        elif route == "chitchat" and score >= THRESHOLD_ROUTING:
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
         elif score >= THRESHOLD_ROUTING:
