@@ -1,0 +1,72 @@
+# generated: 2026-05-19T22:09:47+02:00
+# last_updated: 2026-05-19T22:09:47+02:00
+# project: tegmen
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts/phase-2-persistance
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-05-19T22:09:47+02:00
+last_updated: 2026-05-29T20:10:00+02:00
+project: tegmen
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts/phase-2-persistance
+
+development_status:
+  # ── Epic 1: Fondation de Persistance et Isolation ──────────────────────────
+  epic-1: in-progress
+  1-1-provisionnement-de-l-infrastructure-postgresql-hybride: done
+  1-2-configuration-de-l-orm-et-des-migrations-isolees-pattern-2b: done
+  epic-1-retrospective: optional
+
+  # ── Epic 2: Routage Intelligent et Résilient ───────────────────────────────
+  epic-2: backlog
+  2-1-integrite-du-protocole-a2a-et-retrocompatibilite: backlog
+  2-2-routage-unitaire-et-clarification: backlog
+  2-3-routage-parallele-automatique-party-mode-et-resilience: backlog
+  epic-2-retrospective: optional
+
+  # ── Epic 3: Fluidité Conversationnelle (Gestion des Interruptions) ─────────
+  epic-3: backlog
+  3-1-detection-hors-domaine-pattern-yield: backlog
+  3-2-pile-de-contexte-suspend-et-resume: backlog
+  3-3-nettoyage-et-cloture-du-contexte-garbage-collection: backlog
+  epic-3-retrospective: optional
+
+  # ── Epic 4: Mémoire Personnalisée et Raisonnement Croisé ───────────────────
+  epic-4: backlog
+  4-1-extraction-et-evaluation-des-nouveaux-faits: backlog
+  4-2-stockage-hybride-sql-et-vector: backlog
+  4-3-integration-par-le-prompt-croisement-des-connaissances: backlog
+  4-4-resolution-de-conflits-semantiques-mise-a-jour-des-faits: backlog
+  4-5-decouverte-semantique-et-retrieval-top-k: backlog
+  epic-4-retrospective: optional

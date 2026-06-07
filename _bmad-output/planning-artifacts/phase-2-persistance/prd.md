@@ -124,6 +124,8 @@ L'architecture A2A de la Phase 1 est conservée. Le `a2a-sdk` (v2.0) est étendu
 - FR6: L'agent expert peut détecter une requête hors-domaine et rendre la main.
 - FR7: Le système peut suspendre et mémoriser l'état d'une session spécialisée lors d'une digression.
 - FR8: Le système peut relancer automatiquement la session de l'agent au point exact où elle a été suspendue.
+- FR8b: Le système nettoie silencieusement la pile de contextes si l'interruption s'éternise au-delà d'un délai défini ou d'un volume d'échanges (Garbage Collection).
+- FR8c: L'utilisateur peut explicitement indiquer à Maestro d'annuler ou de clore un contexte suspendu.
 
 ### Mémoire Distribuée (Hard & Soft Facts)
 - FR9: L'agent expert peut extraire de nouveaux "Faits" et évaluer leur importance.
