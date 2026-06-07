@@ -117,6 +117,13 @@ def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[s
             best_route = max(scores.items(), key=lambda x: x[1])
             return best_route[0], float(best_route[1])
 
+        # Short input lock: If the message is a single word and an agent is active,
+        # force routing to the active agent's route.
+        words = message.strip().split()
+        if len(words) == 1:
+            logger.info(f"Short input detected ('{message}'), forcing active agent route '{active_route}'")
+            return active_route, 1.0
+
         # Apply bonus
         if active_route in scores:
             scores[active_route] = min(scores[active_route] * STICKY_BONUS_MULTIPLIER, 1.0)

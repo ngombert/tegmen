@@ -143,3 +143,20 @@ def test_classify_intent_none_active_agent_equivalent():
         
         assert (route1, score1) == (route2, score2)
         assert route1 == "gourmet"
+
+
+@patch("agent_maestro.router.get_all_scores")
+def test_classify_intent_short_input_lock(mock_get_all_scores):
+    """A single-word message should force routing to the active agent with confidence 1.0."""
+    mock_get_all_scores.return_value = {
+        "gourmet": 0.05,
+        "chitchat": 0.88,
+    }
+    
+    # Active agent is gourmet. Single-word input "consulter".
+    # It should bypass chitchat and lock to gourmet.
+    route, score = classify_intent("consulter", active_agent="agent_gourmet")
+    
+    assert route == "gourmet"
+    assert score == 1.0
+
