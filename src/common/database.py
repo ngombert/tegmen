@@ -1,23 +1,34 @@
 """Database module - SQLAlchemy async engine and session factory."""
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine, AsyncEngine
 from sqlalchemy.orm import DeclarativeBase
 
 from common.config import config
 
+
+def create_async_engine_for_agent(database_url: str, debug: bool = False) -> AsyncEngine:
+    """Create an async engine for a specific agent."""
+    return create_async_engine(
+        database_url,
+        echo=debug,
+        future=True,
+    )
+
+
+def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    """Create a session factory for a given async engine."""
+    return async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+
 # Create async engine
-engine = create_async_engine(
-    config.DATABASE_URL,
-    echo=config.DEBUG,
-    future=True,
-)
+engine = create_async_engine_for_agent(config.DATABASE_URL, config.DEBUG)
 
 # Session factory
-async_session_factory = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+async_session_factory = create_session_factory(engine)
 
 
 class Base(DeclarativeBase):

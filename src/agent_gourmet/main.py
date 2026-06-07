@@ -17,7 +17,20 @@ logger = setup_logger("agent_gourmet")
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events."""
     logger.info("🚀 Starting Agent Gourmet (Lean Mode)...")
+    
+    # Initialize DB engine
+    from agent_gourmet.app.db.session import engine as db_engine
+    logger.info("🗄️ Database engine initialized for Gourmet.")
+    
     yield
+    
+    # Clean up DB engine
+    try:
+        from agent_gourmet.app.db.session import engine as db_engine
+        logger.info("🔌 Disposing Database engine for Gourmet...")
+        await db_engine.dispose()
+    except Exception as e:
+        logger.error(f"Failed to dispose Database engine for Gourmet: {e}", exc_info=True)
     logger.info("👋 Shutting down Agent Gourmet...")
 
 

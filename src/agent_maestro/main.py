@@ -48,7 +48,20 @@ async def lifespan(app: FastAPI):
     logger.info("🔗 A2A Gateway Mode: Agents loaded from registry")
     for agent in agent_registry.list_agents():
         logger.info(f"   - {agent['name']}: {agent['url']}")
+    
+    # Initialize DB engine connection log
+    from agent_maestro.app.db.session import engine as db_engine
+    logger.info("🗄️ Database engine initialized for Maestro.")
+    
     yield
+    
+    # Clean up DB engine
+    try:
+        from agent_maestro.app.db.session import engine as db_engine
+        logger.info("🔌 Disposing Database engine for Maestro...")
+        await db_engine.dispose()
+    except Exception as e:
+        logger.error(f"Failed to dispose Database engine for Maestro: {e}", exc_info=True)
     logger.info("👋 Shutting down Tegmen Maestro...")
 
 

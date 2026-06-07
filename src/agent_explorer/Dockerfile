@@ -15,7 +15,9 @@ COPY pyproject.toml uv.lock ./
 # --frozen : sécurité (ne met pas à jour le lockfile)
 # --no-dev : pas de pytest, etc.
 # --no-install-project : on n'installe pas le projet lui-même, juste les libs
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync --frozen --no-install-project --no-dev --no-cache
+
+
 
 # --- Stage 2 : Runtime (Image finale propre) ---
 FROM python:3.13-slim-bookworm
