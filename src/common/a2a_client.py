@@ -1,7 +1,7 @@
 """A2A Client for Maestro to communicate with remote agents."""
 
 import httpx
-from typing import Optional
+from typing import Optional, Any
 import uuid
 
 from common.config import config
@@ -32,7 +32,7 @@ class RemoteAgentClient:
             timeout=actual_timeout
         )
 
-    async def send_message(self, message: str, context_id: str | None = None, context: Optional["RequestContext"] = None) -> str:
+    async def send_message(self, message: str, context_id: str | None = None, context: Optional["RequestContext"] = None, return_raw: bool = False) -> Any:
         """Send a message to the remote agent and get response."""
 
         # Use JsonRpcTransport directly to avoid A2AClient DeprecationWarning
@@ -89,6 +89,9 @@ class RemoteAgentClient:
                 message=f"Erreur interne lors de l'appel A2A vers {self.agent_url}: {str(e)}"
             )
 
+        if return_raw:
+            return result
+
         # Extract text from response result
         if result:
             # Handle plain dictionary (Lean agents)
@@ -134,8 +137,8 @@ class RemoteAgentClient:
 
 
 async def call_remote_agent(
-    route: str, message: str, context_id: str | None = None, timeout: float | None = None, context: Optional["RequestContext"] = None
-) -> str:
+    route: str, message: str, context_id: str | None = None, timeout: float | None = None, context: Optional["RequestContext"] = None, return_raw: bool = False
+) -> Any:
     """Call a remote agent by route name."""
     # Resolve agent URL from registry
     url = agent_registry.get_agent_url(route)
@@ -144,6 +147,6 @@ async def call_remote_agent(
 
     client = RemoteAgentClient(url, timeout=timeout)
     try:
-        return await client.send_message(message, context_id, context)
+        return await client.send_message(message, context_id, context, return_raw=return_raw)
     finally:
         await client.close()

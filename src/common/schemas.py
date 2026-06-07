@@ -2,6 +2,39 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
+class ContextStackItem(BaseModel):
+    """Represents a suspended conversation context item in the stack."""
+    model_config = ConfigDict(
+        strict=True,
+        extra="forbid"
+    )
+    agent: str
+    context_data: dict = Field(default_factory=dict)
+
+
+class FactSchema(BaseModel):
+    """Represents an extracted fact with its importance score."""
+    model_config = ConfigDict(
+        strict=True,
+        extra="forbid"
+    )
+    content: str
+    importance_score: float
+    type: str = "soft"  # 'hard' or 'soft'
+    metadata: dict | None = None
+
+
+class YieldResponse(BaseModel):
+    """Payload returned by an agent when yielding control back to Maestro."""
+    model_config = ConfigDict(
+        strict=True,
+        extra="forbid"
+    )
+    status: str = "yield"
+    message: str
+    context_stack: list[ContextStackItem] = Field(default_factory=list)
+
+
 class RequestContext(BaseModel):
     """Context information for A2A requests."""
     model_config = ConfigDict(
@@ -28,6 +61,8 @@ class RequestContext(BaseModel):
     language: str = "fr"
     preferences: dict | None = None
     restrictions: list[str] | None = None
+    context_stack: list[ContextStackItem] | None = None
+
 
 
 class JsonRpcError(BaseModel):
