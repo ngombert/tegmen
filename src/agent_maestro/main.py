@@ -537,13 +537,40 @@ async def route_request(
     else:
         # Check for explicit agent invocation
         explicit_agent = detect_explicit_agent(message)
-        if explicit_agent:
-            logger.info(f"Explicit agent routing detected: target={explicit_agent}")
-            route = explicit_agent
-            score = 1.0
-        else:
-            # Classify intent
-            route, score = classify_intent(message, active_agent) if message else ("unknown", 0.0)
+        
+        async def get_routing():
+            if explicit_agent:
+                logger.info(f"Explicit agent routing detected: target={explicit_agent}")
+                return explicit_agent, 1.0
+            return classify_intent(message, active_agent) if message else ("unknown", 0.0)
+
+        async def fetch_facts():
+            if not message:
+                return [], []
+            try:
+                from common.embedding_service import embedding_service
+                from agent_maestro.app.services.fact_service import search_relevant_facts, get_hard_facts
+                query_text = f"query: {message}"
+                query_embedding = await embedding_service.embed(query_text)
+                async with maestro_db_session.async_session_factory() as session:
+                    soft_facts = await search_relevant_facts(session, context.family_id, query_embedding, top_k=5)
+                    hard_facts = await get_hard_facts(session, context.family_id, context.user_id)
+                    return soft_facts, hard_facts
+            except Exception as fe:
+                logger.error(f"Failed to fetch facts in parallel: {fe}")
+                return [], []
+
+        (route, score), (soft_facts, hard_facts) = await asyncio.gather(get_routing(), fetch_facts())
+        
+        # Format known facts
+        known_facts_list = []
+        for hf in hard_facts:
+            known_facts_list.append(f"Fait structuré ({hf.category}) : {hf.key} = {hf.value}")
+        for sf in soft_facts:
+            known_facts_list.append(f"Fait sémantique : {sf.content}")
+            
+        if known_facts_list:
+            context.known_facts = known_facts_list
 
     logger.info(f"🎯 Intent classified: route='{route}', score={score:.4f}")
 
@@ -621,6 +648,7 @@ async def route_request(
                 route=route,
                 message=message,
                 context_id=session_id or str(request.id),
+                context=context,
                 return_raw=True,
             )
             if isinstance(raw_response, dict) and "new_facts_payload" in raw_response:
@@ -647,6 +675,7 @@ async def route_request(
                     route=route,
                     message=message,
                     context_id=session_id or str(request.id),
+                    context=context,
                     return_raw=True,
                 )
                 if isinstance(digression_response, dict) and "new_facts_payload" in digression_response:
@@ -812,12 +841,40 @@ async def chat(
                 await session_store.set(session_id, f"agent_{route}")
     else:
         explicit_agent = detect_explicit_agent(sanitized_message)
-        if explicit_agent:
-            logger.info(f"Explicit agent routing detected (legacy): target={explicit_agent}")
-            route = explicit_agent
-            score = 1.0
-        else:
-            route, score = classify_intent(sanitized_message, active_agent)
+        
+        async def get_routing():
+            if explicit_agent:
+                logger.info(f"Explicit agent routing detected (legacy): target={explicit_agent}")
+                return explicit_agent, 1.0
+            return classify_intent(sanitized_message, active_agent) if sanitized_message else ("unknown", 0.0)
+
+        async def fetch_facts():
+            if not sanitized_message:
+                return [], []
+            try:
+                from common.embedding_service import embedding_service
+                from agent_maestro.app.services.fact_service import search_relevant_facts, get_hard_facts
+                query_text = f"query: {sanitized_message}"
+                query_embedding = await embedding_service.embed(query_text)
+                async with maestro_db_session.async_session_factory() as session:
+                    soft_facts = await search_relevant_facts(session, context.family_id, query_embedding, top_k=5)
+                    hard_facts = await get_hard_facts(session, context.family_id, context.user_id)
+                    return soft_facts, hard_facts
+            except Exception as fe:
+                logger.error(f"Failed to fetch facts in parallel (legacy): {fe}")
+                return [], []
+
+        (route, score), (soft_facts, hard_facts) = await asyncio.gather(get_routing(), fetch_facts())
+        
+        # Format known facts
+        known_facts_list = []
+        for hf in hard_facts:
+            known_facts_list.append(f"Fait structuré ({hf.category}) : {hf.key} = {hf.value}")
+        for sf in soft_facts:
+            known_facts_list.append(f"Fait sémantique : {sf.content}")
+            
+        if known_facts_list:
+            context.known_facts = known_facts_list
             
     logger.info(f"Routing decision: route='{route}', score={score:.4f}")
 
@@ -865,6 +922,7 @@ async def chat(
                 route=route,
                 message=sanitized_message,
                 context_id=session_id,
+                context=context,
                 return_raw=True,
             )
             if isinstance(raw_response, dict) and "new_facts_payload" in raw_response:
@@ -891,6 +949,7 @@ async def chat(
                     route=route,
                     message=sanitized_message,
                     context_id=session_id,
+                    context=context,
                     return_raw=True,
                 )
                 if isinstance(digression_response, dict) and "new_facts_payload" in digression_response:

@@ -183,3 +183,122 @@ async def test_soft_fact_storage_synthetic():
             assert len(results) == 1
             assert results[0].content == "Nicolas aime cuisiner les pâtes"
 
+
+import jwt
+from unittest.mock import patch, AsyncMock
+from httpx import AsyncClient, ASGITransport
+from agent_maestro.main import app
+
+def get_auth_headers(role="parent"):
+    payload = {
+        "family_id": "test-family", 
+        "user_id": "user-parent-1",
+        "role": role
+    }
+    from common.config import config
+    token = jwt.encode(
+        payload,
+        config.JWT_SECRET,
+        algorithm=config.JWT_ALGORITHM
+    )
+    return {"Authorization": f"Bearer {token}"}
+
+@pytest.mark.asyncio
+@patch("agent_maestro.main.call_remote_agent")
+async def test_fact_injection_in_prompt(mock_call_remote_agent):
+    """Verify that Maestro retrieves and injects facts in RequestContext when dispatching to agents."""
+    async with maestro_db_session.async_session_factory() as session:
+        # Hard fact
+        new_hard = HardFact(
+            family_id="test-family",
+            user_id="user-parent-1",
+            category="info_perso",
+            key="age_fils",
+            value="10",
+            source_agent="acadomie",
+            importance_score=0.8
+        )
+        session.add(new_hard)
+        
+        # Soft fact (using unit vector matching our query embedding mock)
+        new_soft = SoftFact(
+            family_id="test-family",
+            user_id="user-parent-1",
+            content="Nicolas est allergique aux noix",
+            embedding=[0.0]*384,
+            source_agent="gourmet",
+            importance_score=0.9
+        )
+        new_soft.embedding[0] = 1.0
+        session.add(new_soft)
+        await session.commit()
+
+    # Mock remote call return
+    mock_call_remote_agent.return_value = {
+        "jsonrpc": "2.0",
+        "result": {
+            "messageId": "msg-123",
+            "role": "agent",
+            "parts": [{"text": "Ceci est un mock"}]
+        },
+        "id": "1"
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        with patch.dict(os.environ, {"USE_MOCK_LLM": "true"}):
+            req_payload = {
+                "jsonrpc": "2.0",
+                "method": "route_message",
+                "params": {
+                    "message": "je veux de l'aide pour les devoirs",
+                    "session_id": "session-123"
+                },
+                "id": "1"
+            }
+            response = await ac.post("/api/v1/routing", json=req_payload, headers=get_auth_headers())
+            assert response.status_code == 200
+            
+            # Verify call_remote_agent was invoked with RequestContext containing known_facts
+            assert mock_call_remote_agent.called
+            args, kwargs = mock_call_remote_agent.call_args
+            context_arg = kwargs.get("context")
+            assert context_arg is not None
+            assert context_arg.known_facts is not None
+            
+            facts_str = " ".join(context_arg.known_facts)
+            assert "age_fils" in facts_str
+            assert "allergique aux noix" in facts_str
+
+@pytest.mark.asyncio
+async def test_specialists_respect_facts_in_mock():
+    """Verify that Gourmet and Acadomie respond differently according to injected known_facts."""
+    # Test Gourmet respect of nuts allergy
+    params_gourmet = {
+        "message": {
+            "parts": [{"text": "Qu'est-ce qu'on mange ?"}]
+        },
+        "contextId": "ctx-123",
+        "context": {
+            "known_facts": ["Nicolas est allergique aux noix"]
+        }
+    }
+    with patch.dict(os.environ, {"USE_MOCK_LLM": "true"}):
+        res_gourmet = await gourmet_message_send(params_gourmet)
+        assert "sans noix" in res_gourmet["parts"][0]["text"]
+
+    # Test Acadomie respect of 10-year old child age
+    params_acadomie = {
+        "message": {
+            "parts": [{"text": "je veux faire mes devoirs"}]
+        },
+        "contextId": "ctx-456",
+        "context": {
+            "known_facts": ["Fait structuré (info_perso) : age_fils = 10"]
+        }
+    }
+    with patch.dict(os.environ, {"USE_MOCK_LLM": "true"}):
+        res_acadomie = await acadomie_message_send(params_acadomie)
+        assert "votre fils de 10 ans" in res_acadomie["parts"][0]["text"]
+
+

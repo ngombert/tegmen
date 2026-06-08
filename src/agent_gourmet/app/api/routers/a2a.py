@@ -114,9 +114,28 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     except Exception as fe:
         logger.warning(f"Failed to extract facts in Gourmet: {fe}")
 
+    # Extract known facts from context
+    context_dict = params.get("context") or {}
+    known_facts = None
+    if isinstance(context_dict, dict):
+        known_facts = context_dict.get("known_facts")
+    elif hasattr(context_dict, "known_facts"):
+        known_facts = context_dict.known_facts
+
+    system_prompt = None
+    if known_facts:
+        facts_text = "\n".join(f"- {fact}" for fact in known_facts)
+        from pathlib import Path
+        try:
+            prompt_path = Path(__file__).parent.parent / "prompts" / "system_prompt.md"
+            base_prompt = prompt_path.read_text(encoding="utf-8")
+        except Exception:
+            base_prompt = "Tu es Gourmet, assistant culinaire de l'écosystème Tegmen."
+        system_prompt = f"{base_prompt}\n\nVoici ce que je sais sur l'utilisateur :\n{facts_text}"
+
     # Use LLM to generate the response (Story 6.6)
     try:
-        response_text = await llm_service.generate_response(text)
+        response_text = await llm_service.generate_response(text, system_prompt)
         if "[yield]" in response_text.lower():
             yield_marker = "[yield]"
             idx = response_text.lower().find(yield_marker)

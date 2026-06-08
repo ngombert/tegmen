@@ -21,6 +21,8 @@ class LLMService:
             off_topic_keywords = ["devoir", "scolaire", "math", "calendrier", "note", "cours", "prof", "école", "ecole"]
             if any(kw in user_prompt.lower() for kw in off_topic_keywords):
                 return "[YIELD] Je suis l'agent Gourmet et je ne peux répondre qu'aux questions culinaires."
+            if system_prompt and "noix" in system_prompt.lower():
+                return "Ceci est une recette simulée sans noix pour l'agent Gourmet (Allergie détectée)."
             return "Ceci est une réponse simulée (Mock LLM) pour l'agent Gourmet."
 
         if system_prompt is None:

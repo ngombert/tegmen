@@ -116,9 +116,19 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
             res["new_facts_payload"] = new_facts_payload
         return res
     
+    # Extract known facts from context
+    context_dict = params.get("context") or {}
+    known_facts = None
+    if isinstance(context_dict, dict):
+        known_facts = context_dict.get("known_facts")
+    elif hasattr(context_dict, "known_facts"):
+        known_facts = context_dict.known_facts
+
     # Simple keyword-based dispatch for Lean Acadomie
     if any(k in text for k in ["devoir", "exercice", "leçon"]):
-        res = format_a2a_message("Je peux vous aider avec les devoirs. Que souhaitez-vous consulter ou ajouter ?", context_id)
+        # Check if known_facts contains information about child's age
+        age_str = "votre fils de 10 ans" if known_facts and any("10 ans" in str(f) or "age_fils" in str(f) for f in known_facts) else "les devoirs"
+        res = format_a2a_message(f"Je peux vous aider avec {age_str}. Que souhaitez-vous consulter ou ajouter ?", context_id)
     elif any(k in text for k in ["calendrier", "examen", "vacance", "événement"]):
         res = format_a2a_message("Je peux consulter le calendrier scolaire pour vous. Que voulez-vous savoir ?", context_id)
     elif any(k in text for k in ["note", "résultat", "moyenne"]):

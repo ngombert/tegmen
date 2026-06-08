@@ -71,6 +71,7 @@ class RequestContext(BaseModel):
     preferences: dict | None = None
     restrictions: list[str] | None = None
     context_stack: list[ContextStackItem] | None = None
+    known_facts: list[str] | None = None
 
 
 
