@@ -22,7 +22,7 @@ def run_command(command: List[str], description: str) -> bool:
     try:
         # Add current directory to PYTHONPATH
         env = os.environ.copy()
-        env["PYTHONPATH"] = os.getcwd()
+        env["PYTHONPATH"] = "src"
 
         # Use simple subprocess.run for now, streaming output would be better but this is simpler
         result = subprocess.run(
@@ -54,10 +54,12 @@ def main():
         [
             "uv",
             "run",
+            "python",
+            "-m",
             "pytest",
-            "tests/test_agent_acadomie.py",
+            "tests/agent_acadomie/test_llm_service.py",
             "tests/test_agent_explorer.py",
-            "tests/test_gourmet_tools.py",
+            "tests/agent_gourmet/test_gourmet_service.py",
         ],
         "Unit Tests (Agents)",
     )
