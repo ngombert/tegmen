@@ -15,8 +15,11 @@ from agent_gourmet.app.context import (
     enrich_error_data,
 )
 
+from common.fact_extractor import FactExtractor
+
 logger = setup_gourmet_logger("gourmet_a2a")
 recipe_service = RecipeService()
+fact_extractor = FactExtractor()
 
 def with_context(func: Callable) -> Callable:
     @wraps(func)
@@ -102,6 +105,15 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     if not text:
         return format_a2a_message("Je n'ai pas bien compris votre message. Que cherchez-vous ?", context_id)
     
+    # Extract facts asynchronously
+    new_facts_payload = None
+    try:
+        extracted_facts = await fact_extractor.extract_facts(text)
+        if extracted_facts:
+            new_facts_payload = {"facts": [f.model_dump() for f in extracted_facts]}
+    except Exception as fe:
+        logger.warning(f"Failed to extract facts in Gourmet: {fe}")
+
     # Use LLM to generate the response (Story 6.6)
     try:
         response_text = await llm_service.generate_response(text)
@@ -111,15 +123,24 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
             message = response_text[idx + len(yield_marker):].strip()
             if not message:
                 message = "Je suis l'agent Gourmet et je passe la main."
-            return {
+            res = {
                 "status": "yield",
                 "message": message,
                 "context_stack": []
             }
-        return format_a2a_message(response_text, context_id)
+            if new_facts_payload:
+                res["new_facts_payload"] = new_facts_payload
+            return res
+        res = format_a2a_message(response_text, context_id)
+        if new_facts_payload:
+            res["new_facts_payload"] = new_facts_payload
+        return res
     except Exception as e:
         logger.error(f"Error calling LLM in handle_message_send: {e}")
-        return format_a2a_message("Désolé, je rencontre une difficulté pour vous répondre actuellement.", context_id)
+        res = format_a2a_message("Désolé, je rencontre une difficulté pour vous répondre actuellement.", context_id)
+        if new_facts_payload:
+            res["new_facts_payload"] = new_facts_payload
+        return res
 
 # Methods mapping for A2AServer registration
 GOURMET_METHODS = {

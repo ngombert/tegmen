@@ -20,12 +20,15 @@ from agent_acadomie.app.schemas.organization import OrganizationRequest, Organiz
 from agent_acadomie.app.services.llm_service import LLMService
 from agent_acadomie.app.services.organization_service import OrganizationService
 
+from common.fact_extractor import FactExtractor
+
 logger = setup_acadomie_logger("acadomie_a2a")
 homework_service = HomeworkService()
 calendar_service = CalendarService()
 grades_service = GradesService()
 llm_service = LLMService()
 organization_service = OrganizationService(llm_service, homework_service, grades_service)
+fact_extractor = FactExtractor()
 
 def with_context(func: Callable) -> Callable:
     @wraps(func)
@@ -92,29 +95,42 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     if not text:
         return format_a2a_message("Je n'ai pas bien compris votre message. Comment puis-je vous aider pour l'école ?", context_id)
     
+    # Extract facts asynchronously
+    new_facts_payload = None
+    try:
+        extracted_facts = await fact_extractor.extract_facts(text)
+        if extracted_facts:
+            new_facts_payload = {"facts": [f.model_dump() for f in extracted_facts]}
+    except Exception as fe:
+        logger.warning(f"Failed to extract facts in Acadomie: {fe}")
+
     # Check for Yield (out-of-domain)
     off_topic_keywords = ["recette", "cuisine", "repas", "plat", "ingrédient", "dîner", "diner", "gâteau", "gateau"]
     if any(kw in text for kw in off_topic_keywords):
-        return {
+        res = {
             "status": "yield",
             "message": "Je suis l'agent Acadomie et je ne peux répondre qu'aux questions scolaires.",
             "context_stack": []
         }
+        if new_facts_payload:
+            res["new_facts_payload"] = new_facts_payload
+        return res
     
     # Simple keyword-based dispatch for Lean Acadomie
     if any(k in text for k in ["devoir", "exercice", "leçon"]):
-        return format_a2a_message("Je peux vous aider avec les devoirs. Que souhaitez-vous consulter ou ajouter ?", context_id)
-    
-    if any(k in text for k in ["calendrier", "examen", "vacance", "événement"]):
-        return format_a2a_message("Je peux consulter le calendrier scolaire pour vous. Que voulez-vous savoir ?", context_id)
+        res = format_a2a_message("Je peux vous aider avec les devoirs. Que souhaitez-vous consulter ou ajouter ?", context_id)
+    elif any(k in text for k in ["calendrier", "examen", "vacance", "événement"]):
+        res = format_a2a_message("Je peux consulter le calendrier scolaire pour vous. Que voulez-vous savoir ?", context_id)
+    elif any(k in text for k in ["note", "résultat", "moyenne"]):
+        res = format_a2a_message("Je peux vous montrer les notes. Pour quelle matière ?", context_id)
+    elif any(k in text for k in ["conseil", "organisation", "révision"]):
+        res = format_a2a_message("Je peux vous donner des conseils d'organisation. Quel est votre besoin ?", context_id)
+    else:
+        res = format_a2a_message("Je suis l'agent Acadomie. Je peux vous aider pour les devoirs, le calendrier et les notes. Que voulez-vous faire ?", context_id)
 
-    if any(k in text for k in ["note", "résultat", "moyenne"]):
-        return format_a2a_message("Je peux vous montrer les notes. Pour quelle matière ?", context_id)
-
-    if any(k in text for k in ["conseil", "organisation", "révision"]):
-        return format_a2a_message("Je peux vous donner des conseils d'organisation. Quel est votre besoin ?", context_id)
-    
-    return format_a2a_message("Je suis l'agent Acadomie. Je peux vous aider pour les devoirs, le calendrier et les notes. Que voulez-vous faire ?", context_id)
+    if new_facts_payload:
+        res["new_facts_payload"] = new_facts_payload
+    return res
 
 @with_context
 async def handle_homework_list(params: dict[str, Any] | None) -> dict[str, Any]:

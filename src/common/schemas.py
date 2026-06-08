@@ -24,6 +24,15 @@ class FactSchema(BaseModel):
     metadata: dict | None = None
 
 
+class NewFactsPayload(BaseModel):
+    """Payload containing new facts extracted from a conversation."""
+    model_config = ConfigDict(
+        strict=True,
+        extra="forbid"
+    )
+    facts: list[FactSchema] = Field(default_factory=list)
+
+
 class YieldResponse(BaseModel):
     """Payload returned by an agent when yielding control back to Maestro."""
     model_config = ConfigDict(
