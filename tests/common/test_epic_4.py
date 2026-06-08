@@ -81,3 +81,105 @@ async def test_a2a_routers_new_facts_payload():
         facts_acadomie = res_acadomie["new_facts_payload"]["facts"]
         assert len(facts_acadomie) == 1
         assert facts_acadomie[0]["metadata"]["key"] == "age_fils"
+
+
+from agent_maestro.app.db import session as maestro_db_session
+from agent_maestro.app.services.fact_service import store_facts, search_relevant_facts, get_hard_facts
+from agent_maestro.app.db.models.hard_fact import HardFact
+from agent_maestro.app.db.models.soft_fact import SoftFact
+from sqlalchemy import delete
+
+@pytest.fixture(autouse=True)
+async def recreate_maestro_db_engine():
+    """Recreate the engine and session factory to bind to the current event loop of this test."""
+    from common.database import create_session_factory
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    # Dispose the old one
+    await maestro_db_session.engine.dispose()
+
+    # Create a new engine with NullPool for the current test loop
+    new_engine = create_async_engine(
+        maestro_db_session.DATABASE_URL,
+        poolclass=NullPool
+    )
+    maestro_db_session.engine = new_engine
+    maestro_db_session.async_session_factory = create_session_factory(new_engine)
+
+    # Clean up tables
+    async with maestro_db_session.async_session_factory() as session:
+        await session.execute(delete(HardFact))
+        await session.execute(delete(SoftFact))
+        await session.commit()
+
+    yield
+
+    # Clean up
+    await new_engine.dispose()
+
+@pytest.mark.asyncio
+async def test_hard_fact_storage():
+    """Verify storing, updating and retrieving hard facts."""
+    async with maestro_db_session.async_session_factory() as session:
+        facts_payload = [
+            {
+                "content": "Allergie aux noix",
+                "importance_score": 0.9,
+                "type": "hard",
+                "metadata": {"category": "allergie", "key": "allergie_noix", "value": "noix"}
+            }
+        ]
+        
+        # Insert
+        await store_facts(session, "fam-1", "user-1", facts_payload, "gourmet")
+        
+        # Retrieve
+        hard_facts = await get_hard_facts(session, "fam-1", "user-1")
+        assert len(hard_facts) == 1
+        assert hard_facts[0].key == "allergie_noix"
+        assert hard_facts[0].value == "noix"
+        
+        # Update
+        facts_payload_updated = [
+            {
+                "content": "Allergie aux noix modifiée",
+                "importance_score": 0.95,
+                "type": "hard",
+                "metadata": {"category": "allergie", "key": "allergie_noix", "value": "noix_amandes"}
+            }
+        ]
+        await store_facts(session, "fam-1", "user-1", facts_payload_updated, "gourmet")
+        
+        # Verify update
+        hard_facts = await get_hard_facts(session, "fam-1", "user-1")
+        assert len(hard_facts) == 1
+        assert hard_facts[0].value == "noix_amandes"
+        assert hard_facts[0].importance_score == 0.95
+
+@pytest.mark.asyncio
+async def test_soft_fact_storage_synthetic():
+    """Verify storing and similarity-searching soft facts with synthetic/mocked embedding."""
+    # We set USE_MOCK_LLM to true so embedding_service uses synthetic vector [1.0, 0.0, ...]
+    with patch.dict(os.environ, {"USE_MOCK_LLM": "true"}):
+        async with maestro_db_session.async_session_factory() as session:
+            facts_payload = [
+                {
+                    "content": "Nicolas aime cuisiner les pâtes",
+                    "importance_score": 0.6,
+                    "type": "soft",
+                    "metadata": {}
+                }
+            ]
+            
+            await store_facts(session, "fam-1", "user-1", facts_payload, "gourmet")
+            
+            # Since mock is true, any embedding generated is [1.0, 0.0, ...] (dimension 384)
+            # Retrieve with synthetic query embedding [1.0, 0.0, ...]
+            query_embedding = [0.0] * 384
+            query_embedding[0] = 1.0
+            
+            results = await search_relevant_facts(session, "fam-1", query_embedding, top_k=5)
+            assert len(results) == 1
+            assert results[0].content == "Nicolas aime cuisiner les pâtes"
+

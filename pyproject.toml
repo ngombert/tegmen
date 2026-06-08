@@ -25,6 +25,7 @@ dependencies = [
     "torch",
     "sqlalchemy[asyncio]>=2.0.45",
     "uvicorn>=0.38.0",
+    "pgvector>=0.4.2",
 ]
 
 [dependency-groups]

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-19T22:09:47+02:00
-last_updated: 2026-06-07T22:05:00+02:00
+last_updated: 2026-06-09T00:17:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -43,7 +43,7 @@ story_location: _bmad-output/implementation-artifacts/phase-2-persistance
 
 development_status:
   # ── Epic 1: Fondation de Persistance et Isolation ──────────────────────────
-  epic-1: in-progress
+  epic-1: done
   1-1-provisionnement-de-l-infrastructure-postgresql-hybride: done
   1-2-configuration-de-l-orm-et-des-migrations-isolees-pattern-2b: done
   epic-1-retrospective: optional
@@ -65,7 +65,7 @@ development_status:
   # ── Epic 4: Mémoire Personnalisée et Raisonnement Croisé ───────────────────
   epic-4: backlog
   4-1-extraction-et-evaluation-des-nouveaux-faits: backlog
-  4-2-stockage-hybride-sql-et-vector: backlog
+  4-2-stockage-hybride-sql-et-vector: done
   4-3-integration-par-le-prompt-croisement-des-connaissances: backlog
   4-4-resolution-de-conflits-semantiques-mise-a-jour-des-faits: backlog
   4-5-decouverte-semantique-et-retrieval-top-k: backlog

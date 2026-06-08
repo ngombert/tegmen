@@ -30,6 +30,21 @@ logger = setup_logger("maestro")
 
 session_store = InMemorySessionStore()
 
+async def save_new_facts(payload: dict, family_id: str, user_id: str, source_agent: str) -> None:
+    """Helper to save new facts in the database without blocking the request flow."""
+    try:
+        from agent_maestro.app.services.fact_service import store_facts
+        
+        facts = payload.get("facts", [])
+        if not facts:
+            return
+
+        async with maestro_db_session.async_session_factory() as session:
+            await store_facts(session, family_id, user_id, facts, source_agent)
+            logger.info(f"Successfully stored {len(facts)} new facts from {source_agent}")
+    except Exception as e:
+        logger.error(f"Failed to store facts from {source_agent}: {e}")
+
 async def push_context(session_id: str, agent: str, context_data: dict = None) -> None:
     """Push a suspended agent context to the DB stack."""
     if not session_id:
@@ -608,6 +623,15 @@ async def route_request(
                 context_id=session_id or str(request.id),
                 return_raw=True,
             )
+            if isinstance(raw_response, dict) and "new_facts_payload" in raw_response:
+                asyncio.create_task(
+                    save_new_facts(
+                        raw_response["new_facts_payload"],
+                        context.family_id,
+                        context.user_id,
+                        route
+                    )
+                )
             if isinstance(raw_response, dict) and raw_response.get("status") == "yield":
                 # active agent yielded!
                 # 1. Push active agent to stack with digression_messages=0
@@ -625,6 +649,15 @@ async def route_request(
                     context_id=session_id or str(request.id),
                     return_raw=True,
                 )
+                if isinstance(digression_response, dict) and "new_facts_payload" in digression_response:
+                    asyncio.create_task(
+                        save_new_facts(
+                            digression_response["new_facts_payload"],
+                            context.family_id,
+                            context.user_id,
+                            route
+                        )
+                    )
                 if isinstance(digression_response, dict) and digression_response.get("status") == "yield":
                     # Double yield — both agents can't handle this. Pop and restore.
                     response_text = digression_response.get("message", "Je ne peux pas répondre actuellement.")
@@ -834,6 +867,15 @@ async def chat(
                 context_id=session_id,
                 return_raw=True,
             )
+            if isinstance(raw_response, dict) and "new_facts_payload" in raw_response:
+                asyncio.create_task(
+                    save_new_facts(
+                        raw_response["new_facts_payload"],
+                        context.family_id,
+                        context.user_id,
+                        route
+                    )
+                )
             if isinstance(raw_response, dict) and raw_response.get("status") == "yield":
                 # active agent yielded!
                 # 1. Push active agent to stack with digression_messages=0
@@ -851,6 +893,15 @@ async def chat(
                     context_id=session_id,
                     return_raw=True,
                 )
+                if isinstance(digression_response, dict) and "new_facts_payload" in digression_response:
+                    asyncio.create_task(
+                        save_new_facts(
+                            digression_response["new_facts_payload"],
+                            context.family_id,
+                            context.user_id,
+                            route
+                        )
+                    )
                 if isinstance(digression_response, dict) and digression_response.get("status") == "yield":
                     # Double yield — both agents can't handle this. Pop and restore.
                     response_text = digression_response.get("message", "Je ne peux pas répondre actuellement.")
