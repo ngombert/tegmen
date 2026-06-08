@@ -1,6 +1,6 @@
 # Story 4.5: Découverte Sémantique et Retrieval (Top-K)
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -19,18 +19,18 @@ So that je puisse fournir un prompt enrichi mais concis aux agents spécialistes
 
 ## Tasks / Subtasks
 
-- [ ] Créer une migration de base de données pour ajouter l'index HNSW (AC: 5)
-  - [ ] Générer une nouvelle migration Alembic pour Maestro
-  - [ ] Déclarer l'index HNSW sur la colonne `embedding` de `soft_facts` en utilisant la distance cosinus
-- [ ] Rendre Top-K configurable (AC: 4)
-  - [ ] Ajouter `DEFAULT_FACTS_TOP_K` (par défaut `5`) dans `src/common/config.py`
-- [ ] Optimiser et filtrer la recherche de faits (AC: 3, 6)
-  - [ ] Dans `fact_service.py` -> `search_relevant_facts`, s'assurer que `is_active == True` est bien appliqué (déjà fait, à blinder).
-  - [ ] Utiliser le paramètre `top_k` dynamique.
-- [ ] Écrire et exécuter les tests (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Écrire `test_top_k_bounds_overflow` dans `tests/common/test_epic_4.py`
-  - [ ] Écrire `test_fact_with_null_embedding` dans `tests/common/test_epic_4.py`
-  - [ ] Ajouter un test marqué `@pytest.mark.requires_model` pour vérifier le fonctionnement avec le vrai modèle (E5-small) si activé.
+- [x] Créer une migration de base de données pour ajouter l'index HNSW (AC: 5)
+  - [x] Générer une nouvelle migration Alembic pour Maestro
+  - [x] Déclarer l'index HNSW sur la colonne `embedding` de `soft_facts` en utilisant la distance cosinus
+- [x] Rendre Top-K configurable (AC: 4)
+  - [x] Ajouter `DEFAULT_FACTS_TOP_K` (par défaut `5`) dans `src/common/config.py`
+- [x] Optimiser et filtrer la recherche de faits (AC: 3, 6)
+  - [x] Dans `fact_service.py` -> `search_relevant_facts`, s'assurer que `is_active == True` est bien appliqué (déjà fait, à blinder).
+  - [x] Utiliser le paramètre `top_k` dynamique.
+- [x] Écrire et exécuter les tests (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Écrire `test_top_k_bounds_overflow` dans `tests/common/test_epic_4.py`
+  - [x] Écrire `test_fact_with_null_embedding` dans `tests/common/test_epic_4.py`
+  - [x] Ajouter un test marqué `@pytest.mark.requires_model` pour vérifier le fonctionnement avec le vrai modèle (E5-small) si activé.
 
 ## Dev Notes
 

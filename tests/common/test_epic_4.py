@@ -427,4 +427,70 @@ async def test_conflict_resolution_hard():
         assert facts[0].is_active is True
 
 
+@pytest.mark.asyncio
+async def test_top_k_bounds_overflow():
+    """Verify retrieval bounds when requesting more/fewer facts than stored."""
+    # We must patch embedding_service.embed to return orthogonal/distinct vectors so they don't trigger conflict deactivation
+    async def mock_embed_distinct(text: str):
+        v = [0.0] * 384
+        # Extract the number from "Fait unique numéro X" to set a unique coordinate
+        try:
+            num = int(text.split(" ")[-1])
+        except Exception:
+            num = 0
+        v[num] = 1.0
+        return v
+
+    with patch("common.embedding_service.embedding_service.embed", side_effect=mock_embed_distinct):
+        async with maestro_db_session.async_session_factory() as session:
+            # Insert 3 facts
+            facts = [
+                {"content": f"Fait unique numéro {i}", "importance_score": 0.5, "type": "soft"}
+                for i in range(3)
+            ]
+            await store_facts(session, "fam-top-k", "user-1", facts, "gourmet")
+
+            query_emb = [0.0] * 384
+            query_emb[0] = 1.0
+            
+            res_more = await search_relevant_facts(session, "fam-top-k", query_emb, top_k=5)
+            assert len(res_more) == 3
+
+            # Try to query top_k = 2 (smaller than inserted)
+            res_fewer = await search_relevant_facts(session, "fam-top-k", query_emb, top_k=2)
+            assert len(res_fewer) == 2
+
+
+@pytest.mark.asyncio
+async def test_fact_with_null_embedding():
+    """Verify handling when query embedding is invalid or None."""
+    async with maestro_db_session.async_session_factory() as session:
+        # Pass invalid embedding to search_relevant_facts and ensure a ValueError is raised
+        # search_relevant_facts needs query_embedding to be a list of float.
+        # Let's ensure passing None raises ValueError.
+        with pytest.raises(ValueError):
+            await search_relevant_facts(session, "fam-null", None, top_k=5)
+
+
+@pytest.mark.asyncio
+async def test_hnsw_index_exists():
+    """Verify that the HNSW index has been successfully created on soft_facts table."""
+    from sqlalchemy import text
+    async with maestro_db_session.async_session_factory() as session:
+        # Check pg_indexes for our hnsw index
+        result = await session.execute(
+            text("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'soft_facts';")
+        )
+        indexes = result.all()
+        index_names = [idx[0] for idx in indexes]
+        index_defs = [idx[1] for idx in indexes]
+        
+        assert "idx_soft_facts_embedding_hnsw" in index_names
+        # Ensure it is using hnsw
+        matching_def = [d for d in index_defs if "idx_soft_facts_embedding_hnsw" in d]
+        assert len(matching_def) == 1
+        assert "hnsw" in matching_def[0].lower()
+
+
+
 

@@ -106,8 +106,13 @@ async def search_relevant_facts(
     session: AsyncSession,
     family_id: str,
     query_embedding: list[float],
-    top_k: int = 5
+    top_k: int | None = None
 ) -> list[SoftFact]:
+    if query_embedding is None or not isinstance(query_embedding, list):
+        raise ValueError("query_embedding must be a list of float")
+    from common.config import config
+    if top_k is None:
+        top_k = config.DEFAULT_FACTS_TOP_K
     """
     Perform a cosine similarity search on the soft_facts table.
     Returns the top_k active facts for the family.

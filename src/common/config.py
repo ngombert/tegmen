@@ -57,6 +57,9 @@ class Settings:
     # Conflict Resolution Configuration
     CONFLICT_SIMILARITY_THRESHOLD: float = float(os.getenv("CONFLICT_SIMILARITY_THRESHOLD", "0.92"))
 
+    # Retrieval Configuration
+    DEFAULT_FACTS_TOP_K: int = int(os.getenv("DEFAULT_FACTS_TOP_K", "5"))
+
 
 @lru_cache
 def get_settings() -> Settings:
