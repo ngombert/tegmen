@@ -465,11 +465,60 @@ async def test_top_k_bounds_overflow():
 async def test_fact_with_null_embedding():
     """Verify handling when query embedding is invalid or None."""
     async with maestro_db_session.async_session_factory() as session:
-        # Pass invalid embedding to search_relevant_facts and ensure a ValueError is raised
-        # search_relevant_facts needs query_embedding to be a list of float.
-        # Let's ensure passing None raises ValueError.
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="query_embedding must be a list of float"):
             await search_relevant_facts(session, "fam-null", None, top_k=5)
+        with pytest.raises(ValueError, match="query_embedding must be a list of float"):
+            await search_relevant_facts(session, "fam-null", "not-a-list", top_k=5)
+
+
+@pytest.mark.asyncio
+async def test_fact_with_wrong_embedding_dimension():
+    """Verify ValueError is raised if query embedding dimension is not 384."""
+    async with maestro_db_session.async_session_factory() as session:
+        with pytest.raises(ValueError, match="must be exactly 384 dimensions"):
+            await search_relevant_facts(session, "fam-dim", [1.0, 2.0], top_k=5)
+
+
+@pytest.mark.asyncio
+async def test_store_facts_rollback_on_error():
+    """Verify that if an insertion fails mid-way, the transaction is rolled back and no partial facts are stored."""
+    async with maestro_db_session.async_session_factory() as session:
+        # First fact is valid
+        # Second fact has an invalid structure that causes an error or database issue (e.g. metadata key causing DB error)
+        # We will mock the session add to raise an exception on the second fact
+        original_add = session.add
+        call_count = 0
+        def mock_add(instance):
+            nonlocal call_count
+            call_count += 1
+            if call_count > 1:
+                raise Exception("Simulated DB Crash")
+            return original_add(instance)
+
+        facts = [
+            {
+                "content": "Fait valide",
+                "importance_score": 0.8,
+                "type": "hard",
+                "metadata": {"category": "info_perso", "key": "valide", "value": "oui"}
+            },
+            {
+                "content": "Fait crash",
+                "importance_score": 0.8,
+                "type": "hard",
+                "metadata": {"category": "info_perso", "key": "crash", "value": "non"}
+            }
+        ]
+
+        with patch.object(session, "add", side_effect=mock_add):
+            with pytest.raises(Exception, match="Simulated DB Crash"):
+                await store_facts(session, "fam-rollback", "user-1", facts, "gourmet")
+
+        # Verify no facts were committed (database is clean of this transaction)
+        stmt = select(HardFact).where(HardFact.family_id == "fam-rollback")
+        res = await session.execute(stmt)
+        results = res.scalars().all()
+        assert len(results) == 0
 
 
 @pytest.mark.asyncio
