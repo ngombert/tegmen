@@ -1,6 +1,6 @@
 # Story 4.4: Résolution de Conflits Sémantiques (Mise à jour des Faits)
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -19,17 +19,17 @@ So that l'assistant reste pertinent dans le temps.
 
 ## Tasks / Subtasks
 
-- [ ] Implémenter la détection de conflits sémantiques pour les Soft Facts (AC: 4, 5)
-  - [ ] Définir la configuration `CONFLICT_SIMILARITY_THRESHOLD` dans le système (dans `src/common/config.py` ou par défaut à `0.92`)
-  - [ ] Dans `store_facts` de `fact_service.py`, pour chaque soft fact à insérer, calculer son embedding
-  - [ ] Rechercher les soft facts existants de la même famille ayant une similarité cosinus supérieure au seuil (distance cosinus < `1 - threshold`)
-  - [ ] Mettre à jour les soft facts conflictuels trouvés en les passant à `is_active = False` avant d'insérer le nouveau fait
-- [ ] Consolider la gestion des conflits pour les Hard Facts (AC: 6)
-  - [ ] S'assurer que les hard facts sur la même clé sont bien mis à jour et que l'importance est mise à jour (déjà implémenté dans 4.2, ajouter des assertions de tests complémentaires si besoin)
-- [ ] Écrire et exécuter les tests (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Écrire `test_conflict_resolution_soft_synthetic` dans `tests/common/test_epic_4.py` en mockant les embeddings pour obtenir des vecteurs avec une similarité contrôlée (> 0.92 et < 0.92)
-  - [ ] Écrire `test_conflict_resolution_hard` dans `tests/common/test_epic_4.py`
-  - [ ] Lancer les tests et valider le comportement
+- [x] Implémenter la détection de conflits sémantiques pour les Soft Facts (AC: 4, 5)
+  - [x] Définir la configuration `CONFLICT_SIMILARITY_THRESHOLD` dans le système (dans `src/common/config.py` ou par défaut à `0.92`)
+  - [x] Dans `store_facts` de `fact_service.py`, pour chaque soft fact à insérer, calculer son embedding
+  - [x] Rechercher les soft facts existants de la même famille ayant une similarité cosinus supérieure au seuil (distance cosinus < `1 - threshold`)
+  - [x] Mettre à jour les soft facts conflictuels trouvés en les passant à `is_active = False` avant d'insérer le nouveau fait
+- [x] Consolider la gestion des conflits pour les Hard Facts (AC: 6)
+  - [x] S'assurer que les hard facts sur la même clé sont bien mis à jour et que l'importance est mise à jour (déjà implémenté dans 4.2, ajouter des assertions de tests complémentaires si besoin)
+- [x] Écrire et exécuter les tests (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Écrire `test_conflict_resolution_soft_synthetic` dans `tests/common/test_epic_4.py` en mockant les embeddings pour obtenir des vecteurs avec une similarité contrôlée (> 0.92 et < 0.92)
+  - [x] Écrire `test_conflict_resolution_hard` dans `tests/common/test_epic_4.py`
+  - [x] Lancer les tests et valider le comportement
 
 ## Dev Notes
 
@@ -45,7 +45,7 @@ So that l'assistant reste pertinent dans le temps.
 
 ### Agent Model Used
 
-Gemini 3.5 Sonnet (High)
+Gemini 3.5 flash (Low)
 
 ### Debug Log References
 

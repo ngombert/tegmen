@@ -87,7 +87,7 @@ from agent_maestro.app.db import session as maestro_db_session
 from agent_maestro.app.services.fact_service import store_facts, search_relevant_facts, get_hard_facts
 from agent_maestro.app.db.models.hard_fact import HardFact
 from agent_maestro.app.db.models.soft_fact import SoftFact
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 @pytest.fixture(autouse=True)
 async def recreate_maestro_db_engine():
@@ -300,5 +300,131 @@ async def test_specialists_respect_facts_in_mock():
     with patch.dict(os.environ, {"USE_MOCK_LLM": "true"}):
         res_acadomie = await acadomie_message_send(params_acadomie)
         assert "votre fils de 10 ans" in res_acadomie["parts"][0]["text"]
+
+
+@pytest.mark.asyncio
+async def test_conflict_resolution_soft_synthetic():
+    """Verify that similar soft facts (similarity > 0.92) are deactivated while others remain active."""
+    # We will mock embedding_service.embed to return controlled unit vectors
+    async def mock_embed(text: str):
+        # We define three distinct vectors
+        # Vector A: [1.0, 0.0, ...]
+        # Vector B: [0.95, 0.31225, 0.0, ...] (Cosine similarity with A is 0.95 > 0.92)
+        # Vector C: [0.5, 0.866, 0.0, ...] (Cosine similarity with A is 0.5 < 0.92)
+        if "Carbonara" in text:
+            # Vector A
+            v = [0.0] * 384
+            v[0] = 1.0
+            return v
+        elif "Bolognaise" in text:
+            # Vector B (similar to A)
+            v = [0.0] * 384
+            v[0] = 0.95
+            v[1] = 0.31225
+            return v
+        else:
+            # Vector C (different)
+            v = [0.0] * 384
+            v[0] = 0.5
+            v[1] = 0.866
+            return v
+
+    with patch("common.embedding_service.embedding_service.embed", side_effect=mock_embed):
+        async with maestro_db_session.async_session_factory() as session:
+            # 1. Insert Fact A
+            fact_a = [{
+                "content": "J'adore les Carbonara",
+                "importance_score": 0.8,
+                "type": "soft",
+                "metadata": {}
+            }]
+            await store_facts(session, "fam-conflict", "user-1", fact_a, "gourmet")
+
+            # Verify Fact A is active
+            stmt = select(SoftFact).where(SoftFact.family_id == "fam-conflict", SoftFact.content == "J'adore les Carbonara")
+            res = await session.execute(stmt)
+            fact_a_db = res.scalar_one()
+            assert fact_a_db.is_active is True
+
+            # 2. Insert Fact B (conflicting, similarity 0.95 > 0.92)
+            fact_b = [{
+                "content": "Je préfère la Bolognaise",
+                "importance_score": 0.85,
+                "type": "soft",
+                "metadata": {}
+            }]
+            await store_facts(session, "fam-conflict", "user-1", fact_b, "gourmet")
+
+            # Verify Fact A has been deactivated
+            stmt_a = select(SoftFact).where(SoftFact.family_id == "fam-conflict", SoftFact.content == "J'adore les Carbonara")
+            res_a = await session.execute(stmt_a)
+            fact_a_db = res_a.scalar_one()
+            assert fact_a_db.is_active is False
+
+            # Verify Fact B is active
+            stmt_b = select(SoftFact).where(SoftFact.family_id == "fam-conflict", SoftFact.content == "Je préfère la Bolognaise")
+            res_b = await session.execute(stmt_b)
+            fact_b_db = res_b.scalar_one()
+            assert fact_b_db.is_active is True
+
+            # 3. Insert Fact C (not conflicting, similarity 0.5 < 0.92)
+            fact_c = [{
+                "content": "Nicolas fait du piano",
+                "importance_score": 0.7,
+                "type": "soft",
+                "metadata": {}
+            }]
+            await store_facts(session, "fam-conflict", "user-1", fact_c, "gourmet")
+
+            # Verify Fact B is still active
+            stmt_b = select(SoftFact).where(SoftFact.family_id == "fam-conflict", SoftFact.content == "Je préfère la Bolognaise")
+            res_b = await session.execute(stmt_b)
+            fact_b_db = res_b.scalar_one()
+            assert fact_b_db.is_active is True
+
+            # Verify Fact C is active
+            stmt_c = select(SoftFact).where(SoftFact.family_id == "fam-conflict", SoftFact.content == "Nicolas fait du piano")
+            res_c = await session.execute(stmt_c)
+            fact_c_db = res_c.scalar_one()
+            assert fact_c_db.is_active is True
+
+
+@pytest.mark.asyncio
+async def test_conflict_resolution_hard():
+    """Verify that inserting a hard fact with an existing category/key updates the value and retains/updates status."""
+    async with maestro_db_session.async_session_factory() as session:
+        fact_initial = [{
+            "content": "Nicolas a 30 ans",
+            "importance_score": 0.8,
+            "type": "hard",
+            "metadata": {"category": "info_perso", "key": "age", "value": 30}
+        }]
+        await store_facts(session, "fam-conflict-hard", "user-2", fact_initial, "acadomie")
+
+        # Verify initial
+        stmt = select(HardFact).where(HardFact.family_id == "fam-conflict-hard", HardFact.key == "age")
+        res = await session.execute(stmt)
+        fact_db = res.scalar_one()
+        assert fact_db.value == "30"
+        assert fact_db.is_active is True
+
+        # Update
+        fact_updated = [{
+            "content": "Nicolas a 31 ans maintenant",
+            "importance_score": 0.9,
+            "type": "hard",
+            "metadata": {"category": "info_perso", "key": "age", "value": 31}
+        }]
+        await store_facts(session, "fam-conflict-hard", "user-2", fact_updated, "acadomie")
+
+        # Verify update (no new row, same row updated)
+        stmt_updated = select(HardFact).where(HardFact.family_id == "fam-conflict-hard", HardFact.key == "age")
+        res_updated = await session.execute(stmt_updated)
+        facts = res_updated.scalars().all()
+        assert len(facts) == 1
+        assert facts[0].value == "31"
+        assert facts[0].importance_score == 0.9
+        assert facts[0].is_active is True
+
 
 

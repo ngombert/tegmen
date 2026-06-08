@@ -54,6 +54,9 @@ class Settings:
     GOURMET_PERSISTENCE_TIMEOUT_MS: int = int(os.getenv("GOURMET_PERSISTENCE_TIMEOUT_MS", "3000"))
     GOURMET_ARTIFICIAL_DELAY_MS: int = int(os.getenv("GOURMET_ARTIFICIAL_DELAY_MS", "0"))
 
+    # Conflict Resolution Configuration
+    CONFLICT_SIMILARITY_THRESHOLD: float = float(os.getenv("CONFLICT_SIMILARITY_THRESHOLD", "0.92"))
+
 
 @lru_cache
 def get_settings() -> Settings:

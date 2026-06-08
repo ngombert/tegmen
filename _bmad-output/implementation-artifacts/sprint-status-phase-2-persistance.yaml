@@ -67,6 +67,6 @@ development_status:
   4-1-extraction-et-evaluation-des-nouveaux-faits: done
   4-2-stockage-hybride-sql-et-vector: done
   4-3-integration-par-le-prompt-croisement-des-connaissances: done
-  4-4-resolution-de-conflits-semantiques-mise-a-jour-des-faits: backlog
+  4-4-resolution-de-conflits-semantiques-mise-a-jour-des-faits: done
   4-5-decouverte-semantique-et-retrieval-top-k: backlog
   epic-4-retrospective: optional

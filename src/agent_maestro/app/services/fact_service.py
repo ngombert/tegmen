@@ -67,6 +67,27 @@ async def store_facts(
             # Generate embedding
             embedding = await embedding_service.embed(content)
             
+            # Semantic conflict resolution
+            from common.config import config
+            # Distance <= 1.0 - threshold
+            max_distance = 1.0 - config.CONFLICT_SIMILARITY_THRESHOLD
+            
+            # Find and deactivate existing conflicting soft facts for this family
+            conflict_stmt = (
+                select(SoftFact)
+                .where(
+                    SoftFact.family_id == family_id,
+                    SoftFact.user_id == user_id,
+                    SoftFact.is_active == True,
+                    SoftFact.embedding.cosine_distance(embedding) <= max_distance
+                )
+            )
+            conflict_result = await session.execute(conflict_stmt)
+            conflicting_facts = conflict_result.scalars().all()
+            for old_fact in conflicting_facts:
+                old_fact.is_active = False
+                logger.info(f"Deactivated conflicting SoftFact: '{old_fact.content}' due to similarity with '{content}'")
+            
             new_soft = SoftFact(
                 family_id=family_id,
                 user_id=user_id,
