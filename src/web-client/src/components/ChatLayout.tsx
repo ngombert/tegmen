@@ -10,12 +10,23 @@ interface ChatLayoutProps {
 export function ChatLayout({ messages, onSendMessage, isLoading }: ChatLayoutProps) {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const prevIsLoading = useRef(isLoading);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
     useEffect(scrollToBottom, [messages]);
+
+    useEffect(() => {
+        if (prevIsLoading.current && !isLoading) {
+            if (document.activeElement === document.body || document.activeElement === null || document.activeElement === inputRef.current) {
+                inputRef.current?.focus();
+            }
+        }
+        prevIsLoading.current = isLoading;
+    }, [isLoading]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,6 +86,7 @@ export function ChatLayout({ messages, onSendMessage, isLoading }: ChatLayoutPro
             <div className="p-4 bg-white border-t border-slate-200">
                 <form onSubmit={handleSubmit} className="relative max-w-4xl mx-auto">
                     <input
+                        ref={inputRef}
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
