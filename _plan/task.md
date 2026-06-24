@@ -37,6 +37,18 @@
 - [x] Implémenter `src/agent_maestro/agents.py` : Fallback Maestro et imports flexibles
 - [x] Intégrer le Runner ADK avec SessionService
 
+### Epic : Gestion de Contexte & Isolation Utilisateur (Claim Check)
+- [ ] Définir l'interface `BaseContextRepository` dans `src/common/context_repository.py`
+- [ ] Implémenter la table `ContextStore` et la persistance dans `src/infrastructure/postgres_context_repository.py` (UUIDv4, JSONB, TTL, Indexation)
+- [ ] Définir les schémas `VisibilityScope` et `ContextMetadata` (avec `owner_id`, `authorized_users`, `visibility_scope`) dans `src/models/context.py` ou `src/common/schemas.py`
+- [ ] Implémenter le service de contrôle d'accès dans `src/common/context_service.py` (`ContextService.hydrate_context` avec détection et blocage d'accès non autorisé)
+- [ ] Créer la dépendance FastAPI d'hydratation automatique `get_hydrated_context` dans `src/common/a2a_server.py`
+- [ ] Adapter `src/common/a2a_client.py` pour propager et intercepter le header `X-Claim-Check-ID`
+- [ ] Implémenter le mécanisme Copy-on-Write (CoW) et de fusion de version dans Maestro (`src/agent_maestro/main.py`) pour la parallélisation en mode "Party"
+- [ ] Écrire le script de migration de données `migration_v4_context_acl.py` pour peupler rétroactivement le champ `owner_id` des contextes existants
+- [ ] Créer une fixture `InMemoryContextRepository` pour les tests unitaires et intégrer un `TimeProvider` pour le "Time-Travel Testing" du TTL
+- [ ] Écrire la suite de tests d'intrusion de sécurité parent-enfant et enfant-enfant (`tests/test_context_security.py` avec tests paramétrés)
+
 ---
 
 ## Phase 3 : Agents Spécialistes (Microservices)

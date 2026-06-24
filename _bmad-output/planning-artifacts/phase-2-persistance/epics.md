@@ -28,6 +28,10 @@ This document provides the complete epic and story breakdown for tegmen, decompo
 - FR11: Le système croise ses connaissances directes (agenda) avec la requête pour contraindre la réponse de l'agent expert.
 - FR12: L'administrateur système déploie ou met à jour la base de données d'un agent de manière totalement isolée.
 - FR13: L'utilisateur peut interroger le système même si des agents spécialistes sont hors ligne.
+- FR14: Maestro doit stocker et associer chaque état de session (notamment l'affinité avec l'agent actif `active_agent`) directement au couple `(family_id, user_id)` en base de données.
+- FR15: Lorsqu'un utilisateur se connecte à partir d'un nouvel appareil ou rafraîchit son client web, Maestro doit charger automatiquement la session active correspondante depuis la base de données.
+- FR16: L'action d'escape (ex: "Laisse tomber ce sujet", "annuler") doit purger l'état de session dans la base de données pour l'utilisateur concerné.
+- FR17: Conserver en base de données un résumé ou les derniers messages échangés pour permettre le re-chargement du prompt de contexte sans dépendre uniquement de l'état en mémoire.
 
 ### NonFunctional Requirements
 
@@ -38,8 +42,10 @@ This document provides the complete epic and story breakdown for tegmen, decompo
 - NFR5 (Stockage Hybride): Les "Hard-Facts" utilisent des tables relationnelles strictes (SQL), tandis que les "Soft-Facts" sont vectorisés via `pgvector` pour la recherche sémantique.
 - NFR6 (Zero Downtime Mutuel): L'indisponibilité d'un agent ne provoque aucune interruption de service sur Maestro ni sur les autres agents.
 - NFR7 (Intégrité des Données): 100% des payloads `State Update` transitent validés strictement par un schéma Pydantic.
-- NFR8 (Dégradation Gracieuse): Si un agent spécialiste met plus de 10 secondes à répondre, Maestro reprend la main (Timeout) pour notifier l'utilisateur.
-- NFR9 (Rétrocompatibilité A2A): Maestro traite sans erreur les réponses d'un agent obsolète de la Phase 1.
+- NFR8: Si un agent spécialiste met plus de 10 secondes à répondre, Maestro reprend la main (Timeout) pour notifier l'utilisateur.
+- NFR9: Maestro traite sans erreur les réponses d'un agent obsolète de la Phase 1.
+- NFR10 (Isolation Maestro): L'état de session utilisateur est géré exclusivement par Maestro dans la base `maestro` (conforme au NFR4).
+- NFR11 (Performance Écriture/Lecture BDD): Le temps d'écriture/lecture de l'état de session en BDD lors d'un message ne doit pas ajouter plus de 50ms de latence au traitement de la requête.
 
 ### Additional Requirements
 
@@ -72,6 +78,7 @@ FR10: Epic 4 - Stockage et recherche sémantique
 FR11: Epic 4 - Croisement des connaissances avec agenda
 FR12: Epic 1 - Déploiement isolé des BDD (Migrations)
 FR13: Epic 2 - Interrogation résiliente (Agents hors ligne)
+FR14, FR15, FR16, FR17: Epic 5 - Persistance de Session et Historique Conversationnel
 
 ### NFR Coverage Map
 
@@ -82,6 +89,7 @@ NFR6: Epic 1 - Zero Downtime Mutuel
 NFR7: Epic 2 - Intégrité Pydantic à 100%
 NFR8: Epic 2 - Dégradation Gracieuse (Timeout 10s)
 NFR9: Epic 2 - Rétrocompatibilité A2A
+NFR10, NFR11: Epic 5 - Persistance de Session et Historique Conversationnel
 
 ## Epic List
 
@@ -103,6 +111,16 @@ Dotter les agents de la capacité à rendre la main (Yield) et permettre à Maes
 Implémenter l'extraction asynchrone, le stockage hybride (SQL/Vector) et le croisement sémantique des Soft/Hard Facts pour rendre l'assistant proactif et ultra-personnalisé.
 **FRs covered:** FR9, FR10, FR11
 **NFRs covered:** NFR5
+
+### Epic 5: Persistance de Session et Historique Conversationnel
+Rendre la session de discussion persistante en base de données PostgreSQL pour permettre la reprise multi-appareil et résister aux redémarrages de l'application ou du serveur.
+**FRs covered:** FR14, FR15, FR16, FR17
+**NFRs covered:** NFR10, NFR11
+
+### Epic 6: Gestion de Contexte & Isolation Utilisateur (Claim Check)
+Industrialiser la gestion de la mémoire à court terme par le pattern Claim Check en introduisant un stockage découplé (Postgres/Redis) et en sécurisant l'accès aux contextes par des listes d'autorisations utilisateur-centriques (ACLs), résolvant les cas d'usage d'intimité intra-foyer et de surprises parentales.
+**FRs covered:** FR7, FR8, FR8b, FR8c, FR14
+**NFRs covered:** NFR10, NFR11
 
 ## Epic 1: Fondation de Persistance et Isolation
 
@@ -299,3 +317,120 @@ So that je puisse fournir un prompt enrichi mais concis aux agents spécialistes
 **When** Maestro cherche des faits associés
 **Then** Maestro utilise un mécanisme optimisé (ex: Fan-out en parallèle vers les bases vectorielles des agents ou consultation d'un index léger)
 **And** seuls les Top-K faits les plus pertinents (score sémantique le plus haut) sont récupérés et intégrés au prompt final.
+
+## Epic 5: Persistance de Session et Historique Conversationnel
+
+Rendre la session de discussion persistante en base de données PostgreSQL pour permettre la reprise multi-appareil et résister aux redémarrages de l'application ou du serveur.
+
+### Story 5.1: Migration et Schéma de Persistance de Session (Alembic)
+
+As a développeur backend,
+I want définir une table `user_sessions` dans la base Maestro et configurer sa migration via Alembic,
+So that les sessions utilisateurs soient associées de manière unique et persistantes en base de données.
+
+**Acceptance Criteria:**
+
+**Given** la base de données PostgreSQL de Maestro
+**When** j'applique la migration Alembic sous `src/agent_maestro/app/db/alembic/`
+**Then** la table `user_sessions` est créée avec les champs `family_id`, `user_id`, `session_id`, `active_agent`, `active_claim_check_id`, `updated_at` et une contrainte d'unicité sur le couple `(family_id, user_id)`
+**And** le champ `active_claim_check_id` est un UUID optionnel pointant vers le claim de contexte actif dans le `ContextStore`.
+
+### Story 5.2: Implémentation du PostgresSessionStore
+
+As a agent système (Maestro),
+I want utiliser un adaptateur `PostgresSessionStore` implémentant l'interface `BaseSessionStore`,
+So that je puisse enregistrer et charger l'état de session de l'utilisateur de manière asynchrone et transparente.
+
+**Acceptance Criteria:**
+
+**Given** un utilisateur connecté avec un `family_id` et un `user_id`
+**When** il envoie un message ou se reconnecte depuis un autre appareil
+**Then** Maestro récupère ou met à jour sa session (incluant l'affinité d'agent et le pointeur de contexte `active_claim_check_id`) via `PostgresSessionStore` en moins de 50ms
+**And** en cas d'action d'annulation ("Laisse tomber"), l'état de la session et le claim de contexte associé en BDD sont correctement purgés.
+
+## Epic 6: Gestion de Contexte & Isolation Utilisateur (Claim Check)
+
+Industrialiser la gestion de la mémoire à court terme par le pattern Claim Check en introduisant un stockage découplé (Postgres/Redis) et en sécurisant l'accès aux contextes par des listes d'autorisations utilisateur-centriques (ACLs), résolvant les cas d'usage d'intimité intra-foyer et de surprises parentales.
+
+### Story 6.1: Interface d'Abstraction du Stockage Contextuel (BaseContextRepository)
+
+As a développeur backend,
+I want définir une interface abstraite pour le stockage du contexte,
+So that je puisse découpler la logique d'hydratation A2A de la base de données sous-jacente et permettre une transition future vers Redis.
+
+**Acceptance Criteria:**
+
+**Given** le fichier `src/common/context_repository.py`
+**When** je définis la classe abstraite `BaseContextRepository`
+**Then** elle expose les méthodes asynchrones `save_context(claim_key, payload, ttl_seconds)` et `get_context(claim_key)`
+**And** elle est documentée pour forcer les implémentations concrètes à respecter ce contrat.
+
+### Story 6.2: Implémentation du PostgresContextRepository et Gestion du TTL
+
+As a développeur backend,
+I want implémenter le repository pour PostgreSQL avec gestion automatique de la péremption,
+So that les contextes de discussion à court terme soient persistés de manière performante et automatiquement purgés après expiration.
+
+**Acceptance Criteria:**
+
+**Given** la base de données Postgres de Maestro
+**When** j'implémente `PostgresContextRepository` dans `src/infrastructure/postgres_context_repository.py`
+**Then** les claims de contexte sont écrits dans une table `context_store` indexée sur `claim_check_id` et `expires_at`
+**And** la méthode `get_context` filtre les résultats pour ignorer les contextes dont le TTL est expiré (`expires_at < NOW()`)
+**And** un mécanisme de nettoyage périodique élimine les enregistrements obsolètes en arrière-plan.
+
+### Story 6.3: Sécurité de Contexte User-Centric et ACL (Validation de Visibilité)
+
+As a utilisateur de la famille,
+I want que mes contextes de discussion privés (notes personnelles, surprises) soient inaccessibles aux autres membres de la famille,
+So that mon intimité et le secret de mes actions soient garantis.
+
+**Acceptance Criteria:**
+
+**Given** un contexte stocké avec les métadonnées `owner_id` (propriétaire) et `authorized_users` (liste d'identifiants autorisés)
+**When** un utilisateur (`requester_user_id`) tente d'accéder à ce contexte via le service
+**Then** le système autorise l'accès si l'utilisateur est le propriétaire ou fait partie des utilisateurs autorisés
+**And** il lève une exception de sécurité stricte (`PermissionError`) avec rejet 403 si l'utilisateur n'est pas autorisé (ex: un enfant accédant aux préparatifs d'un week-end surprise des parents, ou un enfant accédant aux devoirs d'un autre enfant).
+
+### Story 6.4: Hydratation Automatique et Interception A2A (FastAPI & Header)
+
+As a agent spécialiste,
+I want recevoir automatiquement mon contexte hydraté et sécurisé sans écrire de code d'accès à la base de données,
+So that je puisse me concentrer uniquement sur ma logique métier de traitement.
+
+**Acceptance Criteria:**
+
+**Given** une requête JSON-RPC arrivant sur un serveur A2A
+**When** le header `X-Claim-Check-ID` est intercepté par le serveur FastAPI
+**Then** la dépendance FastAPI `get_hydrated_context` dans `src/common/a2a_server.py` valide le token d'identité de l'appelant
+**And** elle charge le contexte associé depuis le repository et applique le contrôle ACL de la Story 6.3
+**And** elle injecte le `RequestContext` entièrement hydraté directement dans les paramètres de la fonction de l'agent.
+
+### Story 6.5: Parallélisation Sûre en Mode "Party" (Copy-on-Write CoW)
+
+As a agent système (Maestro),
+I want cloner le contexte de départ lors d'un appel parallèle à plusieurs agents (Party Mode) et fusionner leurs retours,
+So that nous évitions les conditions de concurrence et les pertes d'écriture sur le contexte partagé.
+
+**Acceptance Criteria:**
+
+**Given** une requête nécessitant le mode "Party" avec plusieurs agents spécialistes
+**When** Maestro distribue la tâche en parallèle
+**Then** il partage le même `claim_check_id` en lecture seule aux agents enfants
+**And** si un agent enfant modifie son contexte, il écrit une nouvelle version (Copy-on-Write) retournant un nouveau claim check ID
+**And** à la fin de la parallélisation, Maestro fusionne de manière déterministe les nouveaux faits et modifications dans une nouvelle version du contexte parent.
+
+### Story 6.6: Fixtures InMemory et Tests de Voyage dans le Temps (Time-Travel Testing)
+
+As a ingénieur QA,
+I want tester le comportement de la pile de contexte et l'expiration du TTL de manière ultra-rapide et déterministe,
+So that la CI/CD reste performante et exempte de tests instables.
+
+**Acceptance Criteria:**
+
+**Given** la suite de tests `tests/test_context_security.py`
+**When** j'exécute les tests unitaires
+**Then** le système utilise un double de test `InMemoryContextRepository` thread-safe sans dépendance réseau
+**And** j'utilise une abstraction d'horloge (`TimeProvider`/`Clock`) pour simuler le passage du temps (avancer de `TTL + 1 seconde`) sans effectuer de `sleep()` réel
+**And** la suite de tests valide à 100% les scénarios limites d'expiration du TTL et d'usurpation d'identité (tests d'intrusion automatisés).
+
