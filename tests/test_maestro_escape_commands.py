@@ -1,12 +1,11 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 
 from agent_maestro.main import app, session_store, ESCAPE_COMMANDS, ESCAPE_RESPONSE, get_request_context
 from common.auth import get_current_identity
 from common.schemas import JsonRpcRequest, RequestContext
 
-client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def override_dependencies():
@@ -29,6 +28,7 @@ def override_dependencies():
     yield
     app.dependency_overrides.clear()
 
+
 @pytest.mark.asyncio
 async def test_escape_commands_intercepted_and_session_cleared():
     session_id = "test_escape_sess"
@@ -48,7 +48,8 @@ async def test_escape_commands_intercepted_and_session_cleared():
         "id": "req-1"
     }
     
-    response = client.post("/api/v1/routing", json=request_data)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post("/api/v1/routing", json=request_data)
     
     # 3. Check response
     assert response.status_code == 200
@@ -59,6 +60,7 @@ async def test_escape_commands_intercepted_and_session_cleared():
     # 4. Check that session was cleared
     assert await session_store.get(session_id) is None
 
+
 @pytest.mark.asyncio
 async def test_all_escape_commands_recognized():
     for cmd in ESCAPE_COMMANDS:
@@ -66,12 +68,13 @@ async def test_all_escape_commands_recognized():
             "jsonrpc": "2.0",
             "method": "message/send",
             "params": {
-                "message": f"  {cmd.upper()}  ", # test uppercase and spaces
+                "message": f"  {cmd.upper()}  ",  # test uppercase and spaces
                 "session_id": "any_sess"
             },
             "id": "req-1"
         }
         
-        response = client.post("/api/v1/routing", json=request_data)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            response = await ac.post("/api/v1/routing", json=request_data)
         assert response.status_code == 200
         assert response.json()["result"]["message"] == ESCAPE_RESPONSE

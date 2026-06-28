@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-19T22:09:47+02:00
-last_updated: 2026-06-24T17:15:00+02:00
+last_updated: 2026-06-28T22:30:00+02:00
 project: tegmen
 project_key: NOKEY
 tracking_system: file-system
@@ -72,9 +72,9 @@ development_status:
   epic-4-retrospective: optional
 
   # ── Epic 5: Persistance de Session et Historique Conversationnel ───────────
-  epic-5: backlog
-  5-1-migration-et-schema-de-persistance-de-session-alembic: ready-for-dev
-  5-2-implementation-du-postgressessionstore: ready-for-dev
+  epic-5: done
+  5-1-migration-et-schema-de-persistance-de-session-alembic: done
+  5-2-implementation-du-postgressessionstore: done
   epic-5-retrospective: optional
 
   # ── Epic 6: Gestion de Contexte & Isolation Utilisateur (Claim Check) ──────

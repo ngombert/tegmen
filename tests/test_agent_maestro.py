@@ -1,3 +1,4 @@
+import pytest
 import jwt
 from unittest.mock import patch, AsyncMock, MagicMock
 from common.config import config
@@ -18,9 +19,8 @@ with (
 
     from agent_maestro.main import app
 
-from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 
-client = TestClient(app)
 
 def get_auth_headers(user_id: str = "user-parent-1", family_id: str = "test-family"):
     token = jwt.encode(
@@ -31,22 +31,26 @@ def get_auth_headers(user_id: str = "user-parent-1", family_id: str = "test-fami
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_health_check():
-    response = client.get("/health")
+@pytest.mark.asyncio
+async def test_health_check():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/health")
     assert response.status_code == 200
 
 
+@pytest.mark.asyncio
 @patch("agent_maestro.main.classify_intent")
 @patch("agent_maestro.main.call_remote_agent")
-def test_chat_routing_gourmet(mock_call_remote, mock_classify):
+async def test_chat_routing_gourmet(mock_call_remote, mock_classify):
     mock_classify.return_value = ("gourmet", 0.9)
     mock_call_remote.return_value = "Mocked gourmet response"
 
-    response = client.post(
-        "/chat", 
-        json={"message": "Je veux des pâtes"},
-        headers=get_auth_headers()
-    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/chat", 
+            json={"message": "Je veux des pâtes"},
+            headers=get_auth_headers()
+        )
 
     assert response.status_code == 200
     data = response.json()
@@ -55,17 +59,19 @@ def test_chat_routing_gourmet(mock_call_remote, mock_classify):
     assert data["message"] == "Mocked gourmet response"
 
 
+@pytest.mark.asyncio
 @patch("agent_maestro.main.classify_intent")
 @patch("agent_maestro.main.call_remote_agent")
-def test_chat_remote_error(mock_call_remote, mock_classify):
+async def test_chat_remote_error(mock_call_remote, mock_classify):
     mock_classify.return_value = ("gourmet", 0.9)
     mock_call_remote.side_effect = Exception("Remote failure")
 
-    response = client.post(
-        "/chat", 
-        json={"message": "Je veux des pâtes"},
-        headers=get_auth_headers()
-    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/chat", 
+            json={"message": "Je veux des pâtes"},
+            headers=get_auth_headers()
+        )
 
     assert response.status_code == 200
     data = response.json()
@@ -75,15 +81,17 @@ def test_chat_remote_error(mock_call_remote, mock_classify):
     assert any(word in data["message"].lower() for word in ["désolé", "oups", "mince"])
 
 
+@pytest.mark.asyncio
 @patch("agent_maestro.main.classify_intent")
-def test_chat_unknown_intent(mock_classify):
+async def test_chat_unknown_intent(mock_classify):
     mock_classify.return_value = ("unknown", 0.05)
 
-    response = client.post(
-        "/chat", 
-        json={"message": "blabla"},
-        headers=get_auth_headers()
-    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/chat", 
+            json={"message": "blabla"},
+            headers=get_auth_headers()
+        )
 
     assert response.status_code == 200
     data = response.json()
@@ -92,48 +100,56 @@ def test_chat_unknown_intent(mock_classify):
     assert "agent Gourmet" in data["message"]  # From UNKNOWN_RESPONSE constant
 
 
+@pytest.mark.asyncio
 @patch("agent_maestro.main.classify_intent")
-def test_chat_clarification(mock_classify):
+async def test_chat_clarification(mock_classify):
     # Medium confidence score (between 0.15 and 0.3)
     mock_classify.return_value = ("gourmet", 0.2)
 
-    response = client.post(
-        "/chat", 
-        json={"message": "Pâtes ?"},
-        headers=get_auth_headers()
-    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/chat", 
+            json={"message": "Pâtes ?"},
+            headers=get_auth_headers()
+        )
 
     assert response.status_code == 200
     data = response.json()
     assert data["route"] == "gourmet"
     assert data["agent"] == "maestro"
-    assert "pas s\xfbr de bien comprendre" in data["message"].lower()
+    assert "pas sûr de bien comprendre" in data["message"].lower()
     assert "agent **Gourmet**" in data["message"]
 
 
-def test_chat_unauthorized():
-    response = client.post("/chat", json={"message": "No token"})
+@pytest.mark.asyncio
+async def test_chat_unauthorized():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/chat", json={"message": "No token"})
     assert response.status_code == 401
     assert "Authentification requise" in response.json()["detail"]
 
 
+@pytest.mark.asyncio
 @patch("agent_maestro.main.classify_intent")
-def test_chat_rbac_child_blocked(mock_classify):
+async def test_chat_rbac_child_blocked(mock_classify):
     # Child user trying to access explorer (which is restricted in mock_profiles)
     mock_classify.return_value = ("explorer", 0.9)
     
-    response = client.post(
-        "/chat", 
-        json={"message": "Je veux voyager"},
-        headers=get_auth_headers(user_id="user-child-1")
-    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post(
+            "/chat", 
+            json={"message": "Je veux voyager"},
+            headers=get_auth_headers(user_id="user-child-1")
+        )
     
     assert response.status_code == 403
     assert "ne permet pas d'accéder à l'agent 'agent_explorer'" in response.json()["detail"]
 
 
-def test_routes_list():
-    response = client.get("/routes")
+@pytest.mark.asyncio
+async def test_routes_list():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/routes")
     assert response.status_code == 200
     data = response.json()
     assert "agents" in data

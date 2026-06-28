@@ -1,6 +1,6 @@
 # Story 5.1: Migration et Schéma de Persistance de Session (Alembic)
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -40,26 +40,26 @@ So that les sessions utilisateurs soient associées de manière unique et persis
 ## Tasks / Subtasks
 
 ### Task 1: Modélisation ORM de la Session Utilisateur (AC1)
-- [ ] Créer le modèle SQLAlchemy `UserSession` dans `src/agent_maestro/app/db/models/user_session.py`
-  - [ ] Définir les colonnes conformément aux critères de l'AC1
-  - [ ] Ajouter l'indexation sur `family_id` et `user_id`
-  - [ ] Déclarer la contrainte d'unicité composite sur `(family_id, user_id)`
-  - [ ] Utiliser `func.now()` pour `created_at` et configurer le déclencheur onupdate pour `updated_at`
-- [ ] Exposer le modèle `UserSession` dans `src/agent_maestro/app/db/models/__init__.py` pour permettre la détection automatique par Alembic
+- [x] Créer le modèle SQLAlchemy `UserSession` dans `src/agent_maestro/app/db/models/user_session.py`
+  - [x] Définir les colonnes conformément aux critères de l'AC1
+  - [x] Ajouter l'indexation sur `family_id` et `user_id`
+  - [x] Déclarer la contrainte d'unicité composite sur `(family_id, user_id)`
+  - [x] Utiliser `func.now()` pour `created_at` et configurer le déclencheur onupdate pour `updated_at`
+- [x] Exposer le modèle `UserSession` dans `src/agent_maestro/app/db/models/__init__.py` pour permettre la détection automatique par Alembic
 
 ### Task 2: Génération et Exécution de la Migration Alembic (AC1, AC2)
-- [ ] Générer une nouvelle révision de migration pour Maestro :
-  - [ ] `cd src/agent_maestro && uv run alembic -c app/db/alembic.ini revision --autogenerate -m "create_user_sessions_table"`
-  - [ ] Vérifier le fichier généré dans `src/agent_maestro/app/db/alembic/versions/`
-- [ ] Appliquer la migration sur la base de données locale/docker :
-  - [ ] `cd src/agent_maestro && uv run alembic -c app/db/alembic.ini upgrade head`
-  - [ ] Valider que la table a bien été créée dans la base `maestro` uniquement
+- [x] Générer une nouvelle révision de migration pour Maestro :
+  - [x] `cd src/agent_maestro && uv run alembic -c app/db/alembic.ini revision --autogenerate -m "create_user_sessions_table"`
+  - [x] Vérifier le fichier généré dans `src/agent_maestro/app/db/alembic/versions/`
+- [x] Appliquer la migration sur la base de données locale/docker :
+  - [x] `cd src/agent_maestro && uv run alembic -c app/db/alembic.ini upgrade head`
+  - [x] Valider que la table a bien été créée dans la base `maestro` uniquement
 
 ### Task 3: Tests d'Intégrité de Base de Données (AC1)
-- [ ] Créer un test d'intégration `test_user_session_db_integrity` dans `tests/agent_maestro/test_user_session_schema.py`
-  - [ ] Tester l'insertion d'une session valide
-  - [ ] Tester la contrainte d'unicité : tenter d'insérer deux sessions différentes pour le même couple `(family_id, user_id)` et vérifier qu'une exception d'intégrité (`IntegrityError`) est levée
-  - [ ] Tester que `updated_at` change correctement lors d'une mise à jour de ligne
+- [x] Créer un test d'intégration `test_user_session_db_integrity` dans `tests/agent_maestro/test_user_session_schema.py`
+  - [x] Tester l'insertion d'une session valide
+  - [x] Tester la contrainte d'unicité : tenter d'insérer deux sessions différentes pour le même couple `(family_id, user_id)` et vérifier qu'une exception d'intégrité (`IntegrityError`) est levée
+  - [x] Tester que `updated_at` change correctement lors d'une mise à jour de ligne
 
 ---
 
@@ -83,10 +83,21 @@ So that les sessions utilisateurs soient associées de manière unique et persis
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Antigravity (gemini-1.5-pro-like)
 
 ### Debug Log References
 
+- [test-run-log](file:///home/nicolas/.gemini/antigravity/brain/c88360f4-4ab0-48d9-ab97-ae8349ca6460/.system_generated/tasks/task-243.log)
+
 ### Completion Notes List
 
+- Modèle ORM UserSession implémenté avec toutes les contraintes de base de données.
+- Nettoyage du script de migration Alembic pour préserver l'index HNSW pgvector sur `soft_facts`.
+- Migration exécutée avec succès.
+- Tests d'intégration et d'intégrité du schéma BDD écrits et validés à 100%.
+
 ### File List
+
+- [user_session.py](file:///home/nicolas/projects/tegmen/src/agent_maestro/app/db/models/user_session.py)
+- [__init__.py](file:///home/nicolas/projects/tegmen/src/agent_maestro/app/db/models/__init__.py)
+- [test_user_session_schema.py](file:///home/nicolas/projects/tegmen/tests/agent_maestro/test_user_session_schema.py)

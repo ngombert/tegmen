@@ -96,3 +96,8 @@ class InMemorySessionStore(BaseSessionStore):
             if session_id in self._store:
                 del self._store[session_id]
                 logger.debug(f"Session {session_id} manually deleted.")
+
+
+# Deferred import to avoid circular dependency with models/base
+from agent_maestro.app.services.session_store import PostgresSessionStore
+

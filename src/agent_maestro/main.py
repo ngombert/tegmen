@@ -22,13 +22,14 @@ from common.users import get_user_profile
 from common.schemas import JsonRpcRequest, JsonRpcResponse, JsonRpcError, RequestContext
 from common.logger import setup_logger
 from common.tracing import setup_tracing, instrument_app, instrument_client
-from agent_maestro.session import InMemorySessionStore
+from agent_maestro.session import PostgresSessionStore
 from agent_maestro.app.db import session as maestro_db_session
 from agent_maestro.app.db.models.context import Context
 
 logger = setup_logger("maestro")
 
-session_store = InMemorySessionStore()
+session_store = PostgresSessionStore(maestro_db_session.async_session_factory)
+
 
 async def save_new_facts(payload: dict, family_id: str, user_id: str, source_agent: str) -> None:
     """Helper to save new facts in the database without blocking the request flow."""
@@ -620,7 +621,31 @@ async def route_request(
         extra={"method": request.method, "rpc_id": str(request.id), "role": context.role}
     )
 
-    active_agent = await session_store.get(session_id) if session_id else None
+    # Load or initialize user session
+    db_session = await session_store.get_by_user(context.family_id, context.user_id)
+    if db_session:
+        if session_id and session_id != db_session.session_id:
+            db_session = await session_store.set_by_user(
+                family_id=context.family_id,
+                user_id=context.user_id,
+                session_id=session_id,
+                agent_id=db_session.active_agent,
+                active_claim_check_id=db_session.active_claim_check_id,
+                context_summary=db_session.context_summary
+            )
+        elif not session_id:
+            session_id = db_session.session_id
+        active_agent = db_session.active_agent
+    else:
+        if not session_id:
+            session_id = str(uuid.uuid4())
+        db_session = await session_store.set_by_user(
+            family_id=context.family_id,
+            user_id=context.user_id,
+            session_id=session_id,
+            agent_id=None
+        )
+        active_agent = None
 
     if session_id:
         await prune_zombie_contexts(session_id)
@@ -897,7 +922,32 @@ async def chat(
 
     # Step 1: Classify intent with semantic router
     logger.info(f"Processing message for {context.user_name}: '{sanitized_message}'")
-    active_agent = await session_store.get(session_id) if session_id else None
+    
+    # Load or initialize user session
+    db_session = await session_store.get_by_user(context.family_id, context.user_id)
+    if db_session:
+        if session_id and session_id != db_session.session_id:
+            db_session = await session_store.set_by_user(
+                family_id=context.family_id,
+                user_id=context.user_id,
+                session_id=session_id,
+                agent_id=db_session.active_agent,
+                active_claim_check_id=db_session.active_claim_check_id,
+                context_summary=db_session.context_summary
+            )
+        elif not session_id:
+            session_id = db_session.session_id
+        active_agent = db_session.active_agent
+    else:
+        if not session_id:
+            session_id = str(uuid.uuid4())
+        db_session = await session_store.set_by_user(
+            family_id=context.family_id,
+            user_id=context.user_id,
+            session_id=session_id,
+            agent_id=None
+        )
+        active_agent = None
 
     if session_id:
         await prune_zombie_contexts(session_id)
