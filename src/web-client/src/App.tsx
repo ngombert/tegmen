@@ -12,7 +12,14 @@ interface Message {
 
 function App() {
   const [currentUser, setCurrentUser] = useState('user-parent-1');
-  const [sessionId] = useState<string | undefined>(undefined);
+  const [sessionId] = useState<string>(() => {
+    let id = sessionStorage.getItem('tegmen_session_id');
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      sessionStorage.setItem('tegmen_session_id', id);
+    }
+    return id;
+  });
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Bonjour ! Je suis Tegmen Maestro, votre assistant familial. Sélectionnez un profil pour commencer.' }
   ]);

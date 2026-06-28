@@ -50,6 +50,7 @@ export const api = {
             method: "message/send",
             params: {
                 message: message,
+                session_id: sessionId,
                 debug: true // Always request debug info in dev web client
             },
             id: sessionId || Math.random().toString(36).substring(7)
