@@ -69,7 +69,7 @@ def with_context(func: Callable) -> Callable:
 async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     """
     Handler for message/send JSON-RPC method (standard Tegmen chat).
-    Initial implementation with basic keyword dispatch.
+    Uses LLM for chat logic and dynamic delegation.
     """
     if not params or "message" not in params:
         raise A2ARPCError(
@@ -90,7 +90,7 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
             if "text" in part:
                 text += part["text"]
     
-    text = text.lower().strip()
+    text = text.strip()
     
     if not text:
         return format_a2a_message("Je n'ai pas bien compris votre message. Comment puis-je vous aider pour l'école ?", context_id)
@@ -104,18 +104,6 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     except Exception as fe:
         logger.warning(f"Failed to extract facts in Acadomie: {fe}")
 
-    # Check for Yield (out-of-domain)
-    off_topic_keywords = ["recette", "cuisine", "repas", "plat", "ingrédient", "dîner", "diner", "gâteau", "gateau"]
-    if any(kw in text for kw in off_topic_keywords):
-        res = {
-            "status": "yield",
-            "message": "Je suis l'agent Acadomie et je ne peux répondre qu'aux questions scolaires.",
-            "context_stack": []
-        }
-        if new_facts_payload:
-            res["new_facts_payload"] = new_facts_payload
-        return res
-    
     # Extract known facts from context
     context_dict = params.get("context") or {}
     known_facts = None
@@ -124,23 +112,53 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
     elif hasattr(context_dict, "known_facts"):
         known_facts = context_dict.known_facts
 
-    # Simple keyword-based dispatch for Lean Acadomie
-    if any(k in text for k in ["devoir", "exercice", "leçon"]):
-        # Check if known_facts contains information about child's age
-        age_str = "votre fils de 10 ans" if known_facts and any("10 ans" in str(f) or "age_fils" in str(f) for f in known_facts) else "les devoirs"
-        res = format_a2a_message(f"Je peux vous aider avec {age_str}. Que souhaitez-vous consulter ou ajouter ?", context_id)
-    elif any(k in text for k in ["calendrier", "examen", "vacance", "événement"]):
-        res = format_a2a_message("Je peux consulter le calendrier scolaire pour vous. Que voulez-vous savoir ?", context_id)
-    elif any(k in text for k in ["note", "résultat", "moyenne"]):
-        res = format_a2a_message("Je peux vous montrer les notes. Pour quelle matière ?", context_id)
-    elif any(k in text for k in ["conseil", "organisation", "révision"]):
-        res = format_a2a_message("Je peux vous donner des conseils d'organisation. Quel est votre besoin ?", context_id)
-    else:
-        res = format_a2a_message("Je suis l'agent Acadomie. Je peux vous aider pour les devoirs, le calendrier et les notes. Que voulez-vous faire ?", context_id)
+    system_prompt = None
+    if known_facts:
+        facts_text = "\n".join(f"- {fact}" for fact in known_facts)
+        from pathlib import Path
+        try:
+            prompt_path = Path(__file__).parent.parent / "prompts" / "system_prompt.md"
+            base_prompt = prompt_path.read_text(encoding="utf-8")
+        except Exception:
+            base_prompt = "Tu es Acadomie, conseiller pédagogique expert de l'écosystème Tegmen."
+        system_prompt = f"{base_prompt}\n\nVoici ce que je sais sur l'utilisateur :\n{facts_text}"
 
-    if new_facts_payload:
-        res["new_facts_payload"] = new_facts_payload
-    return res
+    # Use LLM to generate the response (dynamic delegation)
+    try:
+        response_text = await llm_service.generate_response(text, system_prompt)
+        
+        # Regex matching for delegation tags: [YIELD:agent] or [delegate:agent]
+        import re
+        delegate_match = re.search(r"\[(?:yield|delegate):(\w+)\]", response_text, re.IGNORECASE)
+        if delegate_match or "[yield]" in response_text.lower():
+            if delegate_match:
+                target_agent = delegate_match.group(1).lower()
+                clean_message = re.sub(r"\[(?:yield|delegate):\w+\]", "", response_text, flags=re.IGNORECASE).strip()
+            else:
+                target_agent = None
+                clean_message = response_text.replace("[yield]", "").replace("[YIELD]", "").strip()
+            
+            res = {
+                "status": "yield",
+                "message": clean_message or "Je passe la main.",
+                "context_stack": []
+            }
+            if target_agent:
+                res["delegate_to"] = target_agent
+            if new_facts_payload:
+                res["new_facts_payload"] = new_facts_payload
+            return res
+            
+        res = format_a2a_message(response_text, context_id)
+        if new_facts_payload:
+            res["new_facts_payload"] = new_facts_payload
+        return res
+    except Exception as e:
+        logger.error(f"Error calling LLM in handle_message_send in Acadomie: {e}")
+        res = format_a2a_message("Désolé, je rencontre une difficulté pour vous répondre actuellement.", context_id)
+        if new_facts_payload:
+            res["new_facts_payload"] = new_facts_payload
+        return res
 
 @with_context
 async def handle_homework_list(params: dict[str, Any] | None) -> dict[str, Any]:

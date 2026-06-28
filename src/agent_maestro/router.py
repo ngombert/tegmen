@@ -86,6 +86,7 @@ THRESHOLD_ROUTING = 0.40      # Full confidence (increased from 0.30)
 THRESHOLD_CLARIFICATION = 0.20 # Ambiguous (increased from 0.15)
 THRESHOLD_ESCAPE_HATCH = 0.95  # Extremely strong intent overrides sticky routing
 STICKY_BONUS_MULTIPLIER = 1.3  # Bonus applied to active agent's score
+THRESHOLD_PARTY_SEMANTIC = 0.55 # Minimum confidence required for both routes to trigger Party Mode sémantiquement
 
 def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[str, float]:
     """
@@ -115,15 +116,17 @@ def classify_intent(message: str, active_agent: Optional[str] = None) -> tuple[s
 
     # Check semantic route overlap
     # We only trigger Party Mode semantically if:
-    # 1. We have at least 2 specialized routes.
-    # 2. Both have scores >= THRESHOLD_ROUTING.
+    # 1. The highest scoring route is NOT chitchat.
+    # 2. Both top 2 specialized routes have scores >= THRESHOLD_ROUTING.
     # 3. The difference between the top 2 specialized scores is extremely small (<= 0.01)
     specialized_scores = {r: s for r, s in scores.items() if r != "chitchat"}
     if len(specialized_scores) >= 2:
         sorted_scores = sorted(specialized_scores.values(), reverse=True)
-        if sorted_scores[0] >= THRESHOLD_ROUTING and sorted_scores[1] >= THRESHOLD_ROUTING:
-            if (sorted_scores[0] - sorted_scores[1]) <= 0.01:
-                return ("party", 1.0)
+        best_overall_route = max(scores.items(), key=lambda x: x[1])[0]
+        if best_overall_route != "chitchat":
+            if sorted_scores[0] >= THRESHOLD_ROUTING and sorted_scores[1] >= THRESHOLD_ROUTING:
+                if (sorted_scores[0] - sorted_scores[1]) <= 0.01:
+                    return ("party", 1.0)
 
     if active_agent:
         # Normalize active_agent to route name (e.g. agent_gourmet -> gourmet)

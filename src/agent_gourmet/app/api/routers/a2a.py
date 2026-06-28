@@ -133,23 +133,32 @@ async def handle_message_send(params: dict[str, Any] | None) -> dict[str, Any]:
             base_prompt = "Tu es Gourmet, assistant culinaire de l'écosystème Tegmen."
         system_prompt = f"{base_prompt}\n\nVoici ce que je sais sur l'utilisateur :\n{facts_text}"
 
-    # Use LLM to generate the response (Story 6.6)
+    # Use LLM to generate the response (dynamic delegation)
     try:
         response_text = await llm_service.generate_response(text, system_prompt)
-        if "[yield]" in response_text.lower():
-            yield_marker = "[yield]"
-            idx = response_text.lower().find(yield_marker)
-            message = response_text[idx + len(yield_marker):].strip()
-            if not message:
-                message = "Je suis l'agent Gourmet et je passe la main."
+        
+        # Regex matching for delegation tags: [YIELD:agent] or [delegate:agent]
+        import re
+        delegate_match = re.search(r"\[(?:yield|delegate):(\w+)\]", response_text, re.IGNORECASE)
+        if delegate_match or "[yield]" in response_text.lower():
+            if delegate_match:
+                target_agent = delegate_match.group(1).lower()
+                clean_message = re.sub(r"\[(?:yield|delegate):\w+\]", "", response_text, flags=re.IGNORECASE).strip()
+            else:
+                target_agent = None
+                clean_message = response_text.replace("[yield]", "").replace("[YIELD]", "").strip()
+            
             res = {
                 "status": "yield",
-                "message": message,
+                "message": clean_message or "Je passe la main.",
                 "context_stack": []
             }
+            if target_agent:
+                res["delegate_to"] = target_agent
             if new_facts_payload:
                 res["new_facts_payload"] = new_facts_payload
             return res
+            
         res = format_a2a_message(response_text, context_id)
         if new_facts_payload:
             res["new_facts_payload"] = new_facts_payload

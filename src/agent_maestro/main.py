@@ -281,17 +281,27 @@ def detect_explicit_agent(message: str) -> str | None:
     """Detect if the user is explicitly naming/asking for a specific agent."""
     if not message:
         return None
-    msg_lower = message.lower()
+    msg_lower = message.lower().strip()
     agents = ["gourmet", "acadomie", "explorer"]
-    triggers = ["demande à", "demande a", "parle à", "parle a", "invoque", "appelle", "lance", "agent"]
     
+    # 1. Exact match (just the agent name or "agent name")
+    if msg_lower in agents:
+        return msg_lower
+    if msg_lower in [f"agent {a}" for a in agents]:
+        return msg_lower.replace("agent ", "")
+        
+    # 2. Direct addressing with punctuation (e.g., "gourmet: ...", "acadomie, ...")
     for agent in agents:
         if msg_lower.startswith(f"{agent}:") or msg_lower.startswith(f"agent {agent}:"):
             return agent
-        if msg_lower.startswith(f"{agent},") or msg_lower.startswith(f"{agent} "):
+        if msg_lower.startswith(f"{agent},") or msg_lower.startswith(f"agent {agent},"):
             return agent
+            
+    # 3. Explicit action triggers (e.g., "demande à gourmet", "parle à explorer")
+    triggers = ["demande à", "demande a", "parle à", "parle a", "invoque", "appelle", "lance"]
+    for agent in agents:
         for trigger in triggers:
-            if f"{trigger} {agent}" in msg_lower or f"{agent} {trigger}" in msg_lower:
+            if f"{trigger} {agent}" in msg_lower:
                 return agent
     return None
 
@@ -328,6 +338,19 @@ def is_pure_correction(message: str) -> bool:
             return True
     return False
 
+def detect_meta_query(message: str) -> bool:
+    """Detect if the query is a meta-query asking for agent list or system capabilities."""
+    if not message:
+        return False
+    clean = message.lower().strip()
+    keywords = [
+        "liste des agents", "liste de ses agents", "liste d'agents", "listes des agents",
+        "qui sont les agents", "qui sont-ils", "qui sont ils", "quels sont les agents",
+        "présente l'équipe", "presente l'equipe", "présente tes collègues", "présente tes collegues",
+        "liste des experts", "liste d'experts"
+    ]
+    return any(kw in clean for kw in keywords)
+
 async def generate_synthesis(query: str, agent_responses: dict[str, str]) -> str:
     """Synthesize responses from multiple agents using the LLM."""
     if os.getenv("USE_MOCK_LLM", "false").lower() == "true":
@@ -348,18 +371,19 @@ async def generate_synthesis(query: str, agent_responses: dict[str, str]) -> str
     user_prompt += "\nGénère la synthèse finale."
     
     try:
-        response = await asyncio.wait_for(
-            litellm.acompletion(
-                model=config.LLM_DEFAULT_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.7,
-            ),
-            timeout=10.0
-        )
-        return response.choices[0].message.content
+         response = await asyncio.wait_for(
+             litellm.acompletion(
+                 model=config.LLM_DEFAULT_MODEL,
+                 messages=[
+                     {"role": "system", "content": system_prompt},
+                     {"role": "user", "content": user_prompt}
+                 ],
+                 temperature=0.7,
+                 api_key=config.OPENROUTER_API_KEY if config.OPENROUTER_API_KEY else None,
+             ),
+             timeout=10.0
+         )
+         return response.choices[0].message.content
     except Exception as e:
         logger.error(f"Error generating synthesis: {e}")
         fallback_msg = "Voici les avis de la famille :\n"
@@ -374,7 +398,7 @@ async def call_single_agent(route: str, message: str, context_id: str, context: 
             route=route,
             message=message,
             context_id=context_id,
-            timeout=10.0,
+            timeout=config.DEFAULT_A2A_TIMEOUT,
             context=context
         )
         return route, resp
@@ -442,6 +466,90 @@ async def health_check():
     return HealthResponse()
 
 
+async def dispatch_with_delegation_loop(
+    route: str,
+    message: str,
+    session_id: Optional[str],
+    active_agent: Optional[str],
+    context: RequestContext,
+    request_id: str
+) -> tuple[str, str, str]:
+    """
+    Executes cascading delegation loop with Hop Count limit (TTL).
+    Returns (response_text, agent_name, final_route).
+    """
+    current_route = route
+    hop_count = 0
+    max_hops = 3
+    last_agent_message = ""
+    
+    while hop_count < max_hops:
+        logger.info(f"Dispatch Loop | Calling agent '{current_route}' (hop={hop_count})")
+        try:
+            raw_response = await call_remote_agent(
+                route=current_route,
+                message=message,
+                context_id=session_id or request_id,
+                context=context,
+                return_raw=True,
+            )
+        except Exception as e:
+            logger.warning(f"Dispatch Loop | Remote agent '{current_route}' call failed: {e}")
+            raise
+            
+        # Save new facts if present
+        if isinstance(raw_response, dict) and "new_facts_payload" in raw_response:
+            await save_new_facts(
+                raw_response["new_facts_payload"],
+                context.family_id,
+                context.user_id,
+                current_route
+            )
+            
+        if isinstance(raw_response, dict) and raw_response.get("status") == "yield":
+            # Active agent yielded!
+            if session_id and active_agent and hop_count == 0:
+                await push_context(session_id, active_agent, {"digression_messages": 0})
+                
+            delegate_to = raw_response.get("delegate_to")
+            last_agent_message = raw_response.get("message", "Je passe la main.")
+            
+            if delegate_to:
+                next_route = delegate_to
+                logger.info(f"Yield transition | Explicit delegation from '{current_route}' to '{next_route}'")
+            else:
+                next_route, _ = classify_intent(message, active_agent=None)
+                logger.info(f"Yield transition | Re-routing from '{current_route}' to '{next_route}'")
+                
+            if not next_route or next_route == current_route:
+                logger.warning(f"Yield loop prevention | Next route is empty or identical to current ('{current_route}'). Breaking.")
+                return last_agent_message, "maestro", current_route
+                
+            current_route = next_route
+            hop_count += 1
+        else:
+            # Success!
+            response_text = extract_text_from_result(raw_response)
+            agent_name = f"agent_{current_route}"
+            if session_id:
+                await session_store.set(session_id, agent_name)
+                
+            if last_agent_message:
+                # Prepend the yield transition message to make the handoff clear to the user
+                response_text = f"{last_agent_message}\n\n{response_text}"
+            return response_text, agent_name, current_route
+            
+    # Exceeded max hops! Loop protection.
+    logger.warning(f"Yield loop protection triggered | Exceeded {max_hops} hops.")
+    if session_id:
+        restored = await pop_context(session_id)
+        if restored:
+            restored_agent, _ = restored
+            await session_store.set(session_id, restored_agent)
+            
+    return "Désolé, je me perds un peu entre les différents sujets. Que souhaitez-vous faire exactement ?", "maestro", "maestro"
+
+
 @app.post(
     "/api/v1/routing", 
     response_model=JsonRpcResponse, 
@@ -481,6 +589,28 @@ async def route_request(
 
     # Apply PII filter
     message = sanitize_message(raw_message) if raw_message else ""
+
+    # Check for meta-queries (asking for agent list)
+    if detect_meta_query(message):
+        logger.info("Meta-query detected, returning agents list directly.")
+        agents_list = agent_registry.list_agents()
+        intro = "Voici la liste des agents spécialisés de la famille :\n"
+        details = []
+        for ag in agents_list:
+            if ag["name"] == "gourmet":
+                details.append(f"- 🍳 **Gourmet** : {ag['description']}")
+            elif ag["name"] == "acadomie":
+                details.append(f"- 📚 **Acadomie** : {ag['description']}")
+            elif ag["name"] == "explorer":
+                details.append(f"- 🌍 **Explorer** : {ag['description']}")
+            else:
+                details.append(f"- {ag['name'].capitalize()} : {ag['description']}")
+        response_text = intro + "\n".join(details)
+        return JsonRpcResponse(
+            jsonrpc="2.0",
+            result={"message": response_text, "agent": "maestro", "route": "chitchat"},
+            id=request.id
+        )
         
     # Audit Trail
     log_audit_trail(
@@ -643,70 +773,15 @@ async def route_request(
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
         elif score >= THRESHOLD_ROUTING:
-            # High confidence -> Direct dispatch
-            raw_response = await call_remote_agent(
+            response_text, agent_name, final_route = await dispatch_with_delegation_loop(
                 route=route,
                 message=message,
-                context_id=session_id or str(request.id),
+                session_id=session_id,
+                active_agent=active_agent,
                 context=context,
-                return_raw=True,
+                request_id=str(request.id)
             )
-            if isinstance(raw_response, dict) and "new_facts_payload" in raw_response:
-                asyncio.create_task(
-                    save_new_facts(
-                        raw_response["new_facts_payload"],
-                        context.family_id,
-                        context.user_id,
-                        route
-                    )
-                )
-            if isinstance(raw_response, dict) and raw_response.get("status") == "yield":
-                # active agent yielded!
-                # 1. Push active agent to stack with digression_messages=0
-                if session_id and active_agent:
-                    await push_context(session_id, active_agent, {"digression_messages": 0})
-                
-                # 2. Re-classify intent without active agent to find the new route (digression)
-                route, score = classify_intent(message, active_agent=None)
-                logger.info(f"Yield transition | Re-routing to route={route}, score={score:.4f}")
-                
-                # 3. Call the digression agent
-                digression_response = await call_remote_agent(
-                    route=route,
-                    message=message,
-                    context_id=session_id or str(request.id),
-                    context=context,
-                    return_raw=True,
-                )
-                if isinstance(digression_response, dict) and "new_facts_payload" in digression_response:
-                    asyncio.create_task(
-                        save_new_facts(
-                            digression_response["new_facts_payload"],
-                            context.family_id,
-                            context.user_id,
-                            route
-                        )
-                    )
-                if isinstance(digression_response, dict) and digression_response.get("status") == "yield":
-                    # Double yield — both agents can't handle this. Pop and restore.
-                    response_text = digression_response.get("message", "Je ne peux pas répondre actuellement.")
-                    agent_name = "maestro"
-                    if session_id:
-                        restored = await pop_context(session_id)
-                        if restored:
-                            restored_agent, _ = restored
-                            await session_store.set(session_id, restored_agent)
-                else:
-                    response_text = extract_text_from_result(digression_response)
-                    agent_name = f"agent_{route}"
-                    # Switch active agent to digression agent; context stays in stack
-                    if session_id:
-                        await session_store.set(session_id, agent_name)
-            else:
-                response_text = extract_text_from_result(raw_response)
-                agent_name = f"agent_{route}"
-                if session_id:
-                    await session_store.set(session_id, agent_name)
+            route = final_route
         elif score >= THRESHOLD_CLARIFICATION:
             # Medium confidence -> Clarification
             agent_display = route.capitalize()
@@ -790,6 +865,29 @@ async def chat(
 
     # Step 0: Privacy & Audit
     sanitized_message = sanitize_message(request.message)
+
+    # Check for meta-queries (asking for agent list)
+    if detect_meta_query(sanitized_message):
+        logger.info("Meta-query detected (legacy), returning agents list directly.")
+        agents_list = agent_registry.list_agents()
+        intro = "Voici la liste des agents spécialisés de la famille :\n"
+        details = []
+        for ag in agents_list:
+            if ag["name"] == "gourmet":
+                details.append(f"- 🍳 **Gourmet** : {ag['description']}")
+            elif ag["name"] == "acadomie":
+                details.append(f"- 📚 **Acadomie** : {ag['description']}")
+            elif ag["name"] == "explorer":
+                details.append(f"- 🌍 **Explorer** : {ag['description']}")
+            else:
+                details.append(f"- {ag['name'].capitalize()} : {ag['description']}")
+        response_text = intro + "\n".join(details)
+        return ChatResponse(
+            message=response_text,
+            agent="maestro",
+            session_id=session_id or "",
+            route="chitchat"
+        )
     log_audit_trail(
         event_type="legacy_chat",
         user_id=context.user_id,
@@ -917,70 +1015,15 @@ async def chat(
             response_text = random.choice(CHITCHAT_RESPONSES)
             agent_name = "maestro"
         elif score >= THRESHOLD_ROUTING:
-            # Step 2: Call remote specialized agent via A2A
-            raw_response = await call_remote_agent(
+            response_text, agent_name, final_route = await dispatch_with_delegation_loop(
                 route=route,
                 message=sanitized_message,
-                context_id=session_id,
+                session_id=session_id,
+                active_agent=active_agent,
                 context=context,
-                return_raw=True,
+                request_id=session_id or str(uuid.uuid4())
             )
-            if isinstance(raw_response, dict) and "new_facts_payload" in raw_response:
-                asyncio.create_task(
-                    save_new_facts(
-                        raw_response["new_facts_payload"],
-                        context.family_id,
-                        context.user_id,
-                        route
-                    )
-                )
-            if isinstance(raw_response, dict) and raw_response.get("status") == "yield":
-                # active agent yielded!
-                # 1. Push active agent to stack with digression_messages=0
-                if session_id and active_agent:
-                    await push_context(session_id, active_agent, {"digression_messages": 0})
-                
-                # 2. Re-classify intent without active agent to find the new route (digression)
-                route, score = classify_intent(sanitized_message, active_agent=None)
-                logger.info(f"Yield transition (legacy) | Re-routing to route={route}, score={score:.4f}")
-                
-                # 3. Call the digression agent
-                digression_response = await call_remote_agent(
-                    route=route,
-                    message=sanitized_message,
-                    context_id=session_id,
-                    context=context,
-                    return_raw=True,
-                )
-                if isinstance(digression_response, dict) and "new_facts_payload" in digression_response:
-                    asyncio.create_task(
-                        save_new_facts(
-                            digression_response["new_facts_payload"],
-                            context.family_id,
-                            context.user_id,
-                            route
-                        )
-                    )
-                if isinstance(digression_response, dict) and digression_response.get("status") == "yield":
-                    # Double yield — both agents can't handle this. Pop and restore.
-                    response_text = digression_response.get("message", "Je ne peux pas répondre actuellement.")
-                    agent_name = "maestro"
-                    if session_id:
-                        restored = await pop_context(session_id)
-                        if restored:
-                            restored_agent, _ = restored
-                            await session_store.set(session_id, restored_agent)
-                else:
-                    response_text = extract_text_from_result(digression_response)
-                    agent_name = f"agent_{route}"
-                    # Switch active agent to digression agent; context stays in stack
-                    if session_id:
-                        await session_store.set(session_id, agent_name)
-            else:
-                response_text = extract_text_from_result(raw_response)
-                agent_name = f"agent_{route}"
-                if session_id:
-                    await session_store.set(session_id, agent_name)
+            route = final_route
         elif score >= THRESHOLD_CLARIFICATION:
             # Clarification
             agent_display = route.capitalize()
